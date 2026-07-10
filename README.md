@@ -65,3 +65,13 @@ app/
 main.py
 theme/presets.json
 ```
+
+## Workflow de desenvolvimento
+
+**Neste projeto, trabalhe sempre direto na branch `main`.**
+
+- Não criar branches de feature (`cursor/...`) nem abrir pull requests.
+- Fazer as alterações, commitar na `main` e dar `git push origin main`.
+- Mensagens de commit claras e em português ou inglês, conforme o contexto da mudança.
+
+Instrução para agentes/automações (Cursor Cloud e similares): aplicar mudanças, testar quando fizer sentido, commitar e enviar **somente para `main`** — sem PR intermediário.
