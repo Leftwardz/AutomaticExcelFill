@@ -11,8 +11,9 @@ Aplicativo desktop em Python (CustomTkinter) que monitora uma pasta, detecta arq
 
 ## Requisitos
 
-- Python 3.9 ou 3.12
+- **Python 3.9+** (testado em 3.9 e 3.12)
 - Tkinter (no Linux: pacote `python3-tk`)
+- **Microsoft Excel** no Windows, para gravar arquivos `.xlsb`
 
 ## Instalação
 
@@ -62,11 +63,9 @@ Cada fluxo define:
 | Senha do Excel | Opcional — para arquivos protegidos por senha ao abrir |
 | Colunas | Cabeçalho gravado quando a aba do mês é nova ou vazia |
 
-**Formato `.xlsb`:** suportado para leitura e gravação. No cadastro, informe o nome com extensão `.xlsb` (ex.: `consolidado.xlsb`).
+**Formato `.xlsb`:** leitura do cabeçalho funciona em qualquer sistema. **Gravação** no `.xlsb` usa Excel instalado no **Windows** (via `pywin32`).
 
-**Colunas:** use o campo *Excel de referência* para apontar o arquivo existente e clique em *Carregar do arquivo de referência*, ou cole a linha de cabeçalho / use *Importar outro Excel*.
-
-> `.xlsb` com senha: no Windows com Excel instalado usa automação nativa; sem senha funciona em Linux também.
+> A senha fica salva em texto no `config.json` local (uso em máquina/desktop).
 
 ### Aba do mês
 
