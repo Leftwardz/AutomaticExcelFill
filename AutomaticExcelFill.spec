@@ -17,6 +17,8 @@ a = Analysis(
         'openpyxl',
         'msoffcrypto',
         'msoffcrypto.format.ooxml',
+        'python_calamine',
+        'xlspy',
         'watchdog.observers.inotify',
         'watchdog.observers.polling',
     ],

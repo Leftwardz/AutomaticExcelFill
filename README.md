@@ -56,13 +56,17 @@ Cada fluxo define:
 | Nome | Identificação do fluxo |
 | Arquivo esperado | Nome exato ou com wildcards (`*`, `?`) na pasta monitorada |
 | Pasta do Excel | Onde criar/atualizar a planilha |
-| Nome do Excel | Nome do arquivo `.xlsx` |
-| Senha do Excel | Opcional — para arquivos `.xlsx` protegidos por senha ao abrir |
+| Nome do Excel | Nome do arquivo `.xlsx` ou `.xlsb` |
+| Excel de referência | Caminho opcional do Excel existente para carregar o cabeçalho |
+| Aba de referência | Qual aba ler no Excel de referência (vazio = mês atual) |
+| Senha do Excel | Opcional — para arquivos protegidos por senha ao abrir |
 | Colunas | Cabeçalho gravado quando a aba do mês é nova ou vazia |
 
-**Colunas:** copie a primeira linha de um Excel existente e cole no cadastro do fluxo (separador tab), ou use **Importar do Excel**. A senha informada no fluxo também é usada na importação do cabeçalho.
+**Formato `.xlsb`:** suportado para leitura e gravação. No cadastro, informe o nome com extensão `.xlsb` (ex.: `consolidado.xlsb`).
 
-> A senha fica salva em texto no `config.json` local (uso em máquina/desktop).
+**Colunas:** use o campo *Excel de referência* para apontar o arquivo existente e clique em *Carregar do arquivo de referência*, ou cole a linha de cabeçalho / use *Importar outro Excel*.
+
+> `.xlsb` com senha: no Windows com Excel instalado usa automação nativa; sem senha funciona em Linux também.
 
 ### Aba do mês
 

@@ -13,6 +13,8 @@ class Flow:
   excel_filename: str
   headers: List[str] = field(default_factory=list)
   excel_password: str = ''
+  header_source_path: str = ''
+  header_source_sheet: str = ''
   enabled: bool = True
   id: str = field(default_factory=lambda: str(uuid4()))
 
@@ -29,6 +31,8 @@ class Flow:
       excel_filename=data.get('excel_filename', ''),
       headers=list(data.get('headers') or []),
       excel_password=data.get('excel_password', ''),
+      header_source_path=data.get('header_source_path', ''),
+      header_source_sheet=data.get('header_source_sheet', ''),
       enabled=bool(data.get('enabled', True)),
     )
 

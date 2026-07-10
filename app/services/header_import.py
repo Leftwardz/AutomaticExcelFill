@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import re
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterator, List, Optional
 
-from openpyxl.worksheet.worksheet import Worksheet
-
-from app.services.excel_crypto import ExcelPasswordError, load_workbook_from_path
+from app.services.excel_crypto import is_encrypted_excel
 from app.services.excel_service import current_month_sheet_name
 
 
@@ -32,18 +32,36 @@ def parse_headers_from_text(text: str) -> List[str]:
   return [part.strip() for part in parts if part and str(part).strip()]
 
 
-def _headers_from_sheet(sheet: Worksheet) -> List[str]:
-  if sheet.max_row < 1:
-    return []
-  headers: List[str] = []
-  for col in range(1, sheet.max_column + 1):
-    value = sheet.cell(row=1, column=col).value
-    if value is None:
-      continue
-    text = str(value).strip()
-    if text:
-      headers.append(text)
-  return headers
+def _require_calamine():
+  try:
+    from python_calamine import CalamineWorkbook
+  except ImportError as exc:
+    raise RuntimeError('Dependência python-calamine não instalada.') from exc
+  return CalamineWorkbook
+
+
+@contextmanager
+def _open_excel_path(path: Path, password: Optional[str] = None) -> Iterator[Path]:
+  if not path.is_file():
+    raise FileNotFoundError(str(path))
+
+  if not password or not is_encrypted_excel(path):
+    yield path
+    return
+
+  from app.services.excel_crypto import decrypt_office_file_to_path
+
+  with tempfile.TemporaryDirectory() as tmp:
+    decrypted = Path(tmp) / f'decrypted{path.suffix}'
+    decrypt_office_file_to_path(path, decrypted, password)
+    yield decrypted
+
+
+def list_excel_sheets(path: Path, password: Optional[str] = None) -> List[str]:
+  CalamineWorkbook = _require_calamine()
+  with _open_excel_path(path, password) as work_path:
+    workbook = CalamineWorkbook.from_path(str(work_path))
+    return list(workbook.sheet_names)
 
 
 def read_headers_from_excel(
@@ -52,12 +70,26 @@ def read_headers_from_excel(
   password: Optional[str] = None,
   sheet_name: Optional[str] = None,
 ) -> List[str]:
-  workbook = load_workbook_from_path(excel_path, password=password)
-  target_sheet = sheet_name or current_month_sheet_name()
-  if target_sheet in workbook.sheetnames:
-    sheet = workbook[target_sheet]
-  elif workbook.sheetnames:
-    sheet = workbook[workbook.sheetnames[0]]
-  else:
-    return []
-  return _headers_from_sheet(sheet)
+  CalamineWorkbook = _require_calamine()
+  with _open_excel_path(excel_path, password) as work_path:
+    workbook = CalamineWorkbook.from_path(str(work_path))
+    sheet_names = list(workbook.sheet_names)
+    if not sheet_names:
+      return []
+
+    target_sheet = (sheet_name or '').strip() or current_month_sheet_name()
+    if target_sheet not in sheet_names:
+      target_sheet = sheet_names[0]
+
+    rows = workbook.get_sheet_by_name(target_sheet).to_python()
+    if not rows:
+      return []
+    return [str(cell).strip() for cell in rows[0] if cell is not None and str(cell).strip()]
+
+
+def resolve_header_source_path(flow) -> Optional[Path]:
+  path_value = (getattr(flow, 'header_source_path', '') or '').strip()
+  if not path_value:
+    return None
+  path = Path(path_value)
+  return path if path.is_file() else None

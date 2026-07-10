@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import io
+import shutil
+import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import msoffcrypto
 from msoffcrypto.exceptions import InvalidKeyError
@@ -21,6 +23,26 @@ def is_encrypted_excel(path: Path) -> bool:
   with open(path, 'rb') as handle:
     office_file = msoffcrypto.OfficeFile(handle)
     return bool(office_file.is_encrypted())
+
+
+def decrypt_office_file_to_path(source: Path, destination: Path, password: str) -> None:
+  with open(source, 'rb') as handle:
+    office_file = msoffcrypto.OfficeFile(handle)
+    if not office_file.is_encrypted():
+      shutil.copyfile(source, destination)
+      return
+    if not password:
+      raise ExcelPasswordError(
+        'O arquivo Excel está protegido por senha. Informe a senha no cadastro do fluxo.',
+      )
+    try:
+      office_file.load_key(password=password)
+      with open(destination, 'wb') as out:
+        office_file.decrypt(out)
+    except InvalidKeyError as exc:
+      raise ExcelPasswordError('Senha do Excel incorreta.') from exc
+    except Exception as exc:
+      raise ExcelPasswordError('Não foi possível abrir o Excel com a senha informada.') from exc
 
 
 def load_workbook_from_path(path: Path, password: Optional[str] = None) -> WorkbookType:

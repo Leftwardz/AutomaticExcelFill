@@ -4,7 +4,8 @@ import customtkinter as ctk
 from tkinter import filedialog
 
 from app.models.schema import Flow
-from app.services.header_import import parse_headers_from_text, read_headers_from_excel
+from app.utils.excel_paths import EXCEL_FILETYPES
+from app.services.header_import import list_excel_sheets, parse_headers_from_text, read_headers_from_excel
 from app.services.excel_crypto import ExcelPasswordError
 from app.ui.constants import (
   BTN_HOVER_RED,
@@ -52,7 +53,7 @@ class FlowDialog(ctk.CTkToplevel):
   def __init__(self, master, flow: Flow | None = None, on_save=None):
     super().__init__(master)
     self.title('Fluxo' if flow is None else f'Editar fluxo — {flow.name}')
-    self.geometry('680x720')
+    self.geometry('700x820')
     self.resizable(False, False)
     self.configure(fg_color=THEME_BG)
     self.transient(master)
@@ -81,9 +82,11 @@ class FlowDialog(ctk.CTkToplevel):
     self._name = self._labeled_entry(body, 'Nome do fluxo', 'Ex.: Vendas diárias')
     self._source = self._labeled_entry(body, 'Arquivo esperado na pasta', 'Ex.: planilha_alc_* ou relatorio.csv')
     self._excel_dir = self._path_row(body, 'Pasta do Excel', is_directory=True)
-    self._excel_name = self._labeled_entry(body, 'Nome do arquivo Excel', 'Ex.: consolidado.xlsx')
+    self._excel_name = self._labeled_entry(body, 'Nome do arquivo Excel', 'Ex.: consolidado.xlsb ou consolidado.xlsx')
     self._excel_password = self._labeled_entry(body, 'Senha do Excel (opcional)', 'Senha para abrir/salvar o arquivo')
     self._excel_password.configure(show='*')
+    self._header_source = self._excel_file_row(body, 'Excel de referência (cabeçalho)', pick='file')
+    self._header_sheet = self._labeled_entry(body, 'Aba do Excel de referência (opcional)', 'Ex.: Julho 2026 — vazio = mês atual')
     self._headers = self._headers_block(body)
 
     footer = ctk.CTkFrame(self, fg_color='transparent')
@@ -114,6 +117,27 @@ class FlowDialog(ctk.CTkToplevel):
     ctk.CTkLabel(frame, text=label, font=(FONT, 12), text_color='white', anchor='w').pack(fill='x')
     entry = ctk.CTkEntry(frame, placeholder_text=placeholder, **_entry_kwargs())
     entry.pack(fill='x', pady=(4, 0))
+    return entry
+
+  def _excel_file_row(self, parent, label: str, *, pick: str):
+    frame = ctk.CTkFrame(parent, fg_color='transparent')
+    frame.pack(fill='x', pady=(0, 12))
+    ctk.CTkLabel(frame, text=label, font=(FONT, 12), text_color='white', anchor='w').pack(fill='x')
+    row = ctk.CTkFrame(frame, fg_color='transparent')
+    row.pack(fill='x', pady=(4, 0))
+    entry = ctk.CTkEntry(row, **_entry_kwargs())
+    entry.pack(side='left', fill='x', expand=True)
+
+    def browse():
+      if pick == 'file':
+        path = filedialog.askopenfilename(parent=self, filetypes=EXCEL_FILETYPES)
+      else:
+        path = filedialog.askdirectory(parent=self)
+      if path:
+        entry.delete(0, 'end')
+        entry.insert(0, path)
+
+    ctk.CTkButton(row, text='...', width=40, command=browse, **_secondary_btn_kwargs()).pack(side='left', padx=(8, 0))
     return entry
 
   def _path_row(self, parent, label: str, *, is_directory: bool):
@@ -179,7 +203,13 @@ class FlowDialog(ctk.CTkToplevel):
     ).pack(side='left')
     ctk.CTkButton(
       actions,
-      text='Importar do Excel',
+      text='Carregar do arquivo de referência',
+      command=self._load_headers_from_reference,
+      **_secondary_btn_kwargs(),
+    ).pack(side='left')
+    ctk.CTkButton(
+      actions,
+      text='Importar outro Excel',
       command=self._import_headers_from_excel,
       fg_color=THEME_ACCENT,
       hover_color=THEME_ACCENT_HOVER,
@@ -216,17 +246,48 @@ class FlowDialog(ctk.CTkToplevel):
     self._headers_text.insert('1.0', text.strip())
     self._refresh_headers_count()
 
+  def _load_headers_from_reference(self) -> None:
+    path_value = self._header_source.get().strip()
+    if not path_value:
+      self._show_error('Informe o Excel de referência ou use Importar outro Excel.')
+      return
+    password = self._excel_password.get().strip() or None
+    sheet_name = self._header_sheet.get().strip() or None
+    try:
+      headers = read_headers_from_excel(path_value, password=password, sheet_name=sheet_name)
+    except ExcelPasswordError as exc:
+      self._show_error(str(exc))
+      return
+    except Exception as exc:
+      self._show_error(f'Não foi possível ler o Excel de referência: {exc}')
+      return
+    if not headers:
+      self._show_error('Nenhuma coluna encontrada na primeira linha da aba selecionada.')
+      return
+    self._set_headers_text(headers)
+
   def _import_headers_from_excel(self) -> None:
     path = filedialog.askopenfilename(
       parent=self,
       title='Selecione o Excel de referência',
-      filetypes=[('Excel', '*.xlsx'), ('Todos', '*.*')],
+      filetypes=EXCEL_FILETYPES,
     )
     if not path:
       return
+    self._header_source.delete(0, 'end')
+    self._header_source.insert(0, path)
     password = self._excel_password.get().strip() or None
+    sheet_name = self._header_sheet.get().strip() or None
     try:
-      headers = read_headers_from_excel(path, password=password)
+      sheets = list_excel_sheets(path, password=password)
+      if sheets and not sheet_name:
+        from app.services.excel_service import current_month_sheet_name
+        preferred = current_month_sheet_name()
+        if preferred in sheets:
+          sheet_name = preferred
+          self._header_sheet.delete(0, 'end')
+          self._header_sheet.insert(0, preferred)
+      headers = read_headers_from_excel(path, password=password, sheet_name=sheet_name)
     except ExcelPasswordError as exc:
       self._show_error(str(exc))
       return
@@ -244,6 +305,8 @@ class FlowDialog(ctk.CTkToplevel):
     self._excel_dir.insert(0, self._flow.excel_directory)
     self._excel_name.insert(0, self._flow.excel_filename)
     self._excel_password.insert(0, self._flow.excel_password)
+    self._header_source.insert(0, self._flow.header_source_path)
+    self._header_sheet.insert(0, self._flow.header_source_sheet)
     if self._flow.headers:
       self._set_headers_text(self._flow.headers)
     else:
@@ -255,6 +318,8 @@ class FlowDialog(ctk.CTkToplevel):
     excel_dir = self._excel_dir.get().strip()
     excel_name = self._excel_name.get().strip()
     excel_password = self._excel_password.get().strip()
+    header_source_path = self._header_source.get().strip()
+    header_source_sheet = self._header_sheet.get().strip()
     headers = parse_headers_from_text(self._headers_text_value())
 
     if not name or not source or not excel_dir or not excel_name:
@@ -269,6 +334,8 @@ class FlowDialog(ctk.CTkToplevel):
     self._flow.excel_directory = excel_dir
     self._flow.excel_filename = excel_name
     self._flow.excel_password = excel_password
+    self._flow.header_source_path = header_source_path
+    self._flow.header_source_sheet = header_source_sheet
     self._flow.headers = headers
 
     if self._on_save:

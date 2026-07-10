@@ -11,7 +11,7 @@ from watchdog.observers import Observer
 
 from app.models.schema import AppConfig, Flow
 from app.models.storage import find_flow_by_filename, iter_matching_files, load_config
-from app.services.excel_service import append_csv_to_excel, excel_full_path
+from app.utils.excel_paths import excel_full_path
 
 
 LogCallback = Callable[[str, str], None]
