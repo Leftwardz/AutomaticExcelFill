@@ -13,7 +13,6 @@ Aplicativo desktop em Python (CustomTkinter) que monitora uma pasta, detecta arq
 
 - **Python 3.9+** (testado em 3.9 e 3.12)
 - Tkinter (no Linux: pacote `python3-tk`)
-- **Microsoft Excel** no Windows, para gravar arquivos `.xlsb`
 
 ## Instalação
 
@@ -57,13 +56,13 @@ Cada fluxo define:
 | Nome | Identificação do fluxo |
 | Arquivo esperado | Nome exato ou com wildcards (`*`, `?`) na pasta monitorada |
 | Pasta do Excel | Onde criar/atualizar a planilha |
-| Nome do Excel | Nome do arquivo `.xlsx` ou `.xlsb` |
-| Excel de referência | Caminho opcional do Excel existente para carregar o cabeçalho |
+| Nome do Excel | Nome do arquivo `.xlsx` |
+| Excel de referência | Caminho opcional de um `.xlsx` existente para carregar o cabeçalho |
 | Aba de referência | Qual aba ler no Excel de referência (vazio = mês atual) |
-| Senha do Excel | Opcional — para arquivos protegidos por senha ao abrir |
+| Senha do Excel | Opcional — para arquivos `.xlsx` protegidos por senha ao abrir |
 | Colunas | Cabeçalho gravado quando a aba do mês é nova ou vazia |
 
-**Formato `.xlsb`:** leitura do cabeçalho funciona em qualquer sistema. **Gravação** no `.xlsb` usa Excel instalado no **Windows** (via `pywin32`).
+**Colunas:** informe o *Excel de referência* e clique em *Carregar do arquivo de referência*, cole a linha de cabeçalho, ou use *Importar outro Excel*.
 
 > A senha fica salva em texto no `config.json` local (uso em máquina/desktop).
 

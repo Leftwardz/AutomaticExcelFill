@@ -8,7 +8,6 @@ from typing import List, Optional, Tuple
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.services.excel_crypto import create_empty_workbook, load_workbook_from_path, save_workbook_to_path
-from app.utils.excel_paths import excel_format, excel_full_path
 
 MONTHS_PT = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -19,6 +18,11 @@ MONTHS_PT = [
 def current_month_sheet_name(when: datetime | None = None) -> str:
   when = when or datetime.now()
   return f'{MONTHS_PT[when.month - 1]} {when.year}'
+
+
+def excel_full_path(directory: str, filename: str) -> Path:
+  name = filename if filename.lower().endswith('.xlsx') else f'{filename}.xlsx'
+  return Path(directory) / name
 
 
 def read_tab_csv(path: Path) -> List[List[str]]:
@@ -58,7 +62,7 @@ def _next_data_row(sheet: Worksheet) -> int:
   return sheet.max_row + 1
 
 
-def append_csv_to_xlsx(
+def append_csv_to_excel(
   csv_path: Path,
   excel_path: Path,
   headers: List[str],
@@ -94,38 +98,3 @@ def append_csv_to_xlsx(
 
   save_workbook_to_path(workbook, excel_path, password=excel_password or None)
   return sheet_name, len(rows)
-
-
-def append_csv_to_excel(
-  csv_path: Path,
-  excel_path: Path,
-  headers: List[str],
-  *,
-  sheet_name: str | None = None,
-  excel_password: Optional[str] = None,
-) -> Tuple[str, int]:
-  if excel_format(excel_path) == 'xlsb':
-    from app.services.xlsb_service import append_csv_to_xlsb
-    return append_csv_to_xlsb(
-      csv_path,
-      excel_path,
-      headers,
-      sheet_name=sheet_name,
-      excel_password=excel_password,
-    )
-  return append_csv_to_xlsx(
-    csv_path,
-    excel_path,
-    headers,
-    sheet_name=sheet_name,
-    excel_password=excel_password,
-  )
-
-
-__all__ = [
-  'append_csv_to_excel',
-  'append_csv_to_xlsx',
-  'current_month_sheet_name',
-  'excel_full_path',
-  'read_tab_csv',
-]

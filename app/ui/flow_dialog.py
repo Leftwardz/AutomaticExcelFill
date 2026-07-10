@@ -4,8 +4,7 @@ import customtkinter as ctk
 from tkinter import filedialog
 
 from app.models.schema import Flow
-from app.utils.excel_paths import EXCEL_FILETYPES
-from app.services.header_import import list_excel_sheets, parse_headers_from_text, read_headers_from_excel
+from app.services.header_import import EXCEL_FILETYPES, list_excel_sheets, parse_headers_from_text, read_headers_from_excel
 from app.services.excel_crypto import ExcelPasswordError
 from app.ui.constants import (
   BTN_HOVER_RED,
@@ -82,7 +81,7 @@ class FlowDialog(ctk.CTkToplevel):
     self._name = self._labeled_entry(body, 'Nome do fluxo', 'Ex.: Vendas diárias')
     self._source = self._labeled_entry(body, 'Arquivo esperado na pasta', 'Ex.: planilha_alc_* ou relatorio.csv')
     self._excel_dir = self._path_row(body, 'Pasta do Excel', is_directory=True)
-    self._excel_name = self._labeled_entry(body, 'Nome do arquivo Excel', 'Ex.: consolidado.xlsb ou consolidado.xlsx')
+    self._excel_name = self._labeled_entry(body, 'Nome do arquivo Excel', 'Ex.: consolidado.xlsx')
     self._excel_password = self._labeled_entry(body, 'Senha do Excel (opcional)', 'Senha para abrir/salvar o arquivo')
     self._excel_password.configure(show='*')
     self._header_source = self._excel_file_row(body, 'Excel de referência (cabeçalho)', pick='file')
