@@ -4,6 +4,8 @@ import customtkinter as ctk
 from tkinter import filedialog
 
 from app.models.schema import Flow
+from app.services.header_import import parse_headers_from_text, read_headers_from_excel
+from app.services.excel_crypto import ExcelPasswordError
 from app.ui.constants import (
   BTN_HOVER_RED,
   BTN_RED,
@@ -13,6 +15,7 @@ from app.ui.constants import (
   THEME_BG,
   THEME_CARD,
   THEME_CARD_BORDER,
+  THEME_ERROR_TEXT,
   THEME_NAV_ACTIVE,
   THEME_TEXT_SECONDARY,
 )
@@ -49,7 +52,7 @@ class FlowDialog(ctk.CTkToplevel):
   def __init__(self, master, flow: Flow | None = None, on_save=None):
     super().__init__(master)
     self.title('Fluxo' if flow is None else f'Editar fluxo — {flow.name}')
-    self.geometry('620x560')
+    self.geometry('680x720')
     self.resizable(False, False)
     self.configure(fg_color=THEME_BG)
     self.transient(master)
@@ -79,6 +82,8 @@ class FlowDialog(ctk.CTkToplevel):
     self._source = self._labeled_entry(body, 'Arquivo esperado na pasta', 'Ex.: planilha_alc_* ou relatorio.csv')
     self._excel_dir = self._path_row(body, 'Pasta do Excel', is_directory=True)
     self._excel_name = self._labeled_entry(body, 'Nome do arquivo Excel', 'Ex.: consolidado.xlsx')
+    self._excel_password = self._labeled_entry(body, 'Senha do Excel (opcional)', 'Senha para abrir/salvar o arquivo')
+    self._excel_password.configure(show='*')
     self._headers = self._headers_block(body)
 
     footer = ctk.CTkFrame(self, fg_color='transparent')
@@ -139,75 +144,131 @@ class FlowDialog(ctk.CTkToplevel):
     top = ctk.CTkFrame(frame, fg_color='transparent')
     top.pack(fill='x', padx=12, pady=(12, 8))
     ctk.CTkLabel(top, text='Colunas do Excel (cabeçalho)', font=(FONT, 12, 'bold'), text_color='white').pack(side='left')
+    self._headers_count = ctk.CTkLabel(top, text='0 colunas', font=(FONT, 11), text_color=THEME_TEXT_SECONDARY)
+    self._headers_count.pack(side='right')
+
+    ctk.CTkLabel(
+      frame,
+      text='Cole a linha de cabeçalho copiada do Excel (separada por tab) ou importe de um arquivo.',
+      font=(FONT, 11),
+      text_color=THEME_TEXT_SECONDARY,
+      wraplength=600,
+      justify='left',
+    ).pack(fill='x', padx=12, pady=(0, 8))
+
+    self._headers_text = ctk.CTkTextbox(
+      frame,
+      height=120,
+      fg_color=THEME_BG,
+      border_color=THEME_CARD_BORDER,
+      border_width=1,
+      corner_radius=8,
+      text_color='white',
+      font=(FONT, 11),
+    )
+    self._headers_text.pack(fill='x', padx=12, pady=(0, 8))
+    self._headers_text.bind('<KeyRelease>', lambda _event: self._refresh_headers_count())
+
+    actions = ctk.CTkFrame(frame, fg_color='transparent')
+    actions.pack(fill='x', padx=12, pady=(0, 12))
     ctk.CTkButton(
-      top,
-      text='+ Coluna',
-      width=90,
-      command=self._add_header_row,
+      actions,
+      text='Colar da área de transferência',
+      command=self._paste_headers_from_clipboard,
+      **_secondary_btn_kwargs(),
+    ).pack(side='left')
+    ctk.CTkButton(
+      actions,
+      text='Importar do Excel',
+      command=self._import_headers_from_excel,
       fg_color=THEME_ACCENT,
       hover_color=THEME_ACCENT_HOVER,
       corner_radius=8,
-      height=28,
-    ).pack(side='right')
-
-    self._headers_container = ctk.CTkFrame(frame, fg_color='transparent')
-    self._headers_container.pack(fill='both', expand=True, padx=12, pady=(0, 12))
-    self._header_entries: list[ctk.CTkEntry] = []
-    return frame
-
-  def _add_header_row(self, value: str = ''):
-    row = ctk.CTkFrame(self._headers_container, fg_color='transparent')
-    row.pack(fill='x', pady=2)
-    entry = ctk.CTkEntry(row, placeholder_text='Nome da coluna', **_entry_kwargs())
-    entry.pack(side='left', fill='x', expand=True)
-    if value:
-      entry.insert(0, value)
-    ctk.CTkButton(
-      row,
-      text='×',
-      width=34,
-      command=lambda: self._remove_header_row(row, entry),
-      fg_color=BTN_RED,
-      hover_color=BTN_HOVER_RED,
-      corner_radius=8,
       height=32,
     ).pack(side='left', padx=(8, 0))
-    self._header_entries.append(entry)
 
-  def _remove_header_row(self, row, entry):
-    if entry in self._header_entries:
-      self._header_entries.remove(entry)
-    row.destroy()
+    return frame
+
+  def _headers_text_value(self) -> str:
+    return self._headers_text.get('1.0', 'end').strip()
+
+  def _set_headers_text(self, headers: list[str]) -> None:
+    self._headers_text.delete('1.0', 'end')
+    if headers:
+      self._headers_text.insert('1.0', '\t'.join(headers))
+    self._refresh_headers_count()
+
+  def _refresh_headers_count(self) -> None:
+    count = len(parse_headers_from_text(self._headers_text_value()))
+    label = '1 coluna' if count == 1 else f'{count} colunas'
+    self._headers_count.configure(text=label)
+
+  def _paste_headers_from_clipboard(self) -> None:
+    try:
+      text = self.clipboard_get()
+    except Exception:
+      self._show_error('Não foi possível ler a área de transferência.')
+      return
+    if not text.strip():
+      self._show_error('A área de transferência está vazia.')
+      return
+    self._headers_text.delete('1.0', 'end')
+    self._headers_text.insert('1.0', text.strip())
+    self._refresh_headers_count()
+
+  def _import_headers_from_excel(self) -> None:
+    path = filedialog.askopenfilename(
+      parent=self,
+      title='Selecione o Excel de referência',
+      filetypes=[('Excel', '*.xlsx'), ('Todos', '*.*')],
+    )
+    if not path:
+      return
+    password = self._excel_password.get().strip() or None
+    try:
+      headers = read_headers_from_excel(path, password=password)
+    except ExcelPasswordError as exc:
+      self._show_error(str(exc))
+      return
+    except Exception as exc:
+      self._show_error(f'Não foi possível ler o Excel: {exc}')
+      return
+    if not headers:
+      self._show_error('Nenhuma coluna encontrada na primeira linha da planilha.')
+      return
+    self._set_headers_text(headers)
 
   def _fill(self):
     self._name.insert(0, self._flow.name)
     self._source.insert(0, self._flow.source_filename)
     self._excel_dir.insert(0, self._flow.excel_directory)
     self._excel_name.insert(0, self._flow.excel_filename)
+    self._excel_password.insert(0, self._flow.excel_password)
     if self._flow.headers:
-      for header in self._flow.headers:
-        self._add_header_row(header)
+      self._set_headers_text(self._flow.headers)
     else:
-      self._add_header_row()
+      self._refresh_headers_count()
 
   def _save(self):
     name = self._name.get().strip()
     source = self._source.get().strip()
     excel_dir = self._excel_dir.get().strip()
     excel_name = self._excel_name.get().strip()
-    headers = [entry.get().strip() for entry in self._header_entries if entry.get().strip()]
+    excel_password = self._excel_password.get().strip()
+    headers = parse_headers_from_text(self._headers_text_value())
 
     if not name or not source or not excel_dir or not excel_name:
       self._show_error('Preencha nome, arquivo de origem, pasta e nome do Excel.')
       return
     if not headers:
-      self._show_error('Adicione ao menos uma coluna no cabeçalho.')
+      self._show_error('Informe ao menos uma coluna (cole ou importe o cabeçalho).')
       return
 
     self._flow.name = name
     self._flow.source_filename = source
     self._flow.excel_directory = excel_dir
     self._flow.excel_filename = excel_name
+    self._flow.excel_password = excel_password
     self._flow.headers = headers
 
     if self._on_save:
@@ -217,9 +278,9 @@ class FlowDialog(ctk.CTkToplevel):
   def _show_error(self, message: str):
     dialog = ctk.CTkToplevel(self)
     dialog.title('Validação')
-    dialog.geometry('420x140')
+    dialog.geometry('460x150')
     dialog.configure(fg_color=THEME_BG)
     dialog.transient(self)
     dialog.grab_set()
-    ctk.CTkLabel(dialog, text=message, wraplength=380, text_color='white').pack(padx=16, pady=24)
+    ctk.CTkLabel(dialog, text=message, wraplength=420, text_color=THEME_ERROR_TEXT).pack(padx=16, pady=24)
     ctk.CTkButton(dialog, text='OK', command=dialog.destroy, fg_color=THEME_ACCENT, hover_color=THEME_ACCENT_HOVER).pack(pady=(0, 16))

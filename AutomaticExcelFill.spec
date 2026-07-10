@@ -15,6 +15,8 @@ a = Analysis(
     ],
     hiddenimports=[
         'openpyxl',
+        'msoffcrypto',
+        'msoffcrypto.format.ooxml',
         'watchdog.observers.inotify',
         'watchdog.observers.polling',
     ],

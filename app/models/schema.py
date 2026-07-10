@@ -12,6 +12,7 @@ class Flow:
   excel_directory: str
   excel_filename: str
   headers: List[str] = field(default_factory=list)
+  excel_password: str = ''
   enabled: bool = True
   id: str = field(default_factory=lambda: str(uuid4()))
 
@@ -27,6 +28,7 @@ class Flow:
       excel_directory=data.get('excel_directory', ''),
       excel_filename=data.get('excel_filename', ''),
       headers=list(data.get('headers') or []),
+      excel_password=data.get('excel_password', ''),
       enabled=bool(data.get('enabled', True)),
     )
 

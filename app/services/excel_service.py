@@ -3,10 +3,11 @@ from __future__ import annotations
 import csv
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
-from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
+
+from app.services.excel_crypto import create_empty_workbook, load_workbook_from_path, save_workbook_to_path
 
 MONTHS_PT = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -67,6 +68,7 @@ def append_csv_to_excel(
   headers: List[str],
   *,
   sheet_name: str | None = None,
+  excel_password: Optional[str] = None,
 ) -> Tuple[str, int]:
   sheet_name = sheet_name or current_month_sheet_name()
   rows = read_tab_csv(csv_path)
@@ -75,11 +77,9 @@ def append_csv_to_excel(
 
   excel_path.parent.mkdir(parents=True, exist_ok=True)
   if excel_path.is_file():
-    workbook = load_workbook(excel_path)
+    workbook = load_workbook_from_path(excel_path, password=excel_password or None)
   else:
-    workbook = Workbook()
-    default_sheet = workbook.active
-    workbook.remove(default_sheet)
+    workbook = create_empty_workbook()
 
   if sheet_name in workbook.sheetnames:
     sheet = workbook[sheet_name]
@@ -96,5 +96,5 @@ def append_csv_to_excel(
     for col_index, value in enumerate(row, start=1):
       sheet.cell(row=target_row, column=col_index, value=value)
 
-  workbook.save(excel_path)
+  save_workbook_to_path(workbook, excel_path, password=excel_password or None)
   return sheet_name, len(rows)

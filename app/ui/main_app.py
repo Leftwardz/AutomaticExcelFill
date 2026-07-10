@@ -241,7 +241,7 @@ class App(ctk.CTk):
     table_host.grid(row=1, column=0, sticky='nsew')
     self.flows_view.grid_rowconfigure(1, weight=1)
 
-    columns = ('name', 'source', 'excel', 'headers', 'enabled')
+    columns = ('name', 'source', 'excel', 'headers', 'password', 'enabled')
     self.flows_tree = ttk.Treeview(
       table_host,
       columns=columns,
@@ -252,12 +252,14 @@ class App(ctk.CTk):
     self.flows_tree.heading('source', text='Arquivo esperado')
     self.flows_tree.heading('excel', text='Excel')
     self.flows_tree.heading('headers', text='Colunas')
+    self.flows_tree.heading('password', text='Senha')
     self.flows_tree.heading('enabled', text='Ativo')
-    self.flows_tree.column('name', width=160)
-    self.flows_tree.column('source', width=160)
-    self.flows_tree.column('excel', width=220)
-    self.flows_tree.column('headers', width=80, anchor='center')
-    self.flows_tree.column('enabled', width=70, anchor='center')
+    self.flows_tree.column('name', width=140)
+    self.flows_tree.column('source', width=140)
+    self.flows_tree.column('excel', width=180)
+    self.flows_tree.column('headers', width=70, anchor='center')
+    self.flows_tree.column('password', width=60, anchor='center')
+    self.flows_tree.column('enabled', width=60, anchor='center')
 
     scrollbar = ttk.Scrollbar(table_host, orient='vertical', command=self.flows_tree.yview, style=ARTEMIS_SCROLLBAR_V_STYLE)
     self.flows_tree.configure(yscrollcommand=scrollbar.set)
@@ -384,7 +386,14 @@ class App(ctk.CTk):
         '',
         'end',
         iid=flow.id,
-        values=(flow.name, flow.source_filename, excel_label, len(flow.headers), 'Sim' if flow.enabled else 'Não'),
+        values=(
+          flow.name,
+          flow.source_filename,
+          excel_label,
+          len(flow.headers),
+          'Sim' if flow.excel_password else '—',
+          'Sim' if flow.enabled else 'Não',
+        ),
       )
 
   def _new_flow(self):

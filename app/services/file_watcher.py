@@ -73,7 +73,12 @@ class _CsvHandler(FileSystemEventHandler):
 
     try:
       excel_path = excel_full_path(flow.excel_directory, flow.excel_filename)
-      sheet_name, row_count = append_csv_to_excel(path, excel_path, flow.headers)
+      sheet_name, row_count = append_csv_to_excel(
+        path,
+        excel_path,
+        flow.headers,
+        excel_password=flow.excel_password or None,
+      )
       self._on_log(
         'success',
         f'[{flow.name}] {path.name} → {excel_path.name} / aba "{sheet_name}" (+{row_count} linhas)',
