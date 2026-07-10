@@ -16,11 +16,49 @@ Aplicativo desktop em Python (CustomTkinter) que monitora uma pasta, detecta arq
 
 ## Instalação
 
+### Windows (recomendado)
+
+Dê dois cliques ou rode no terminal, **na pasta do projeto**:
+
+```bat
+scripts\install_deps.bat
+```
+
+Ou no PowerShell:
+
+```powershell
+.\scripts\install_deps.ps1
+```
+
+O script cria o `.venv`, atualiza `pip` e instala as dependências.
+
+### Manual (qualquer sistema)
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+python -m pip install -U pip setuptools wheel
+python -m pip install -r requirements.txt
 ```
+
+> **Use sempre `python -m pip`**, não só `pip` — evita pegar o Python errado.
+
+### Erro `encoding must be str, not None` no pip
+
+Quase sempre é ambiente Python incorreto no Windows:
+
+1. Confirme a versão: `python --version` → precisa ser **3.9+**
+2. Não use Python 2.x (`python2`, `pip2`)
+3. Rode o `scripts\install_deps.bat` (define UTF-8 e cria venv limpo)
+4. Se ainda falhar, no CMD antes do install:
+   ```bat
+   chcp 65001
+   set PYTHONUTF8=1
+   set PYTHONIOENCODING=utf-8
+   python -m pip install -U pip setuptools wheel
+   python -m pip install -r requirements.txt
+   ```
+5. Evite pastas com acentos ou permissão restrita (ex.: `C:\Users\...\AutomaticExcelFill`)
 
 ## Executar
 
