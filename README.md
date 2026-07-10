@@ -11,7 +11,8 @@ Aplicativo desktop em Python (CustomTkinter) que monitora uma pasta, detecta arq
 
 ## Requisitos
 
-- Python 3.10+
+- Python 3.9 ou 3.12
+- Tkinter (no Linux: pacote `python3-tk`)
 
 ## Instalação
 
@@ -25,6 +26,13 @@ pip install -r requirements.txt
 
 ```bash
 python main.py
+```
+
+### Teste rápido no Linux (sem monitor)
+
+```bash
+sudo apt-get install -y python3-tk xvfb
+PYTHONPATH=. xvfb-run -a python3 scripts/smoke_test_gui.py
 ```
 
 ## Gerar executável (PyInstaller)

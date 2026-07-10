@@ -19,7 +19,7 @@ from app.ui.constants import (
 
 
 def _entry_kwargs(**extra):
-  return dict(
+  kwargs = dict(
     fg_color=THEME_BG,
     border_color=THEME_CARD_BORDER,
     border_width=2,
@@ -27,20 +27,22 @@ def _entry_kwargs(**extra):
     height=34,
     text_color='white',
     placeholder_text_color=THEME_TEXT_SECONDARY,
-    **extra,
   )
+  kwargs.update(extra)
+  return kwargs
 
 
 def _secondary_btn_kwargs(**extra):
-  return dict(
+  kwargs = dict(
     fg_color=THEME_NAV_ACTIVE,
     hover_color=THEME_CARD_BORDER,
     border_width=1,
     border_color=THEME_CARD_BORDER,
     corner_radius=8,
     height=32,
-    **extra,
   )
+  kwargs.update(extra)
+  return kwargs
 
 
 class FlowDialog(ctk.CTkToplevel):
