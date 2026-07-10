@@ -76,7 +76,7 @@ class FlowDialog(ctk.CTkToplevel):
     body.pack(fill='both', expand=True, padx=16, pady=16)
 
     self._name = self._labeled_entry(body, 'Nome do fluxo', 'Ex.: Vendas diárias')
-    self._source = self._labeled_entry(body, 'Arquivo esperado na pasta', 'Ex.: relatorio.csv')
+    self._source = self._labeled_entry(body, 'Arquivo esperado na pasta', 'Ex.: planilha_alc_* ou relatorio.csv')
     self._excel_dir = self._path_row(body, 'Pasta do Excel', is_directory=True)
     self._excel_name = self._labeled_entry(body, 'Nome do arquivo Excel', 'Ex.: consolidado.xlsx')
     self._headers = self._headers_block(body)

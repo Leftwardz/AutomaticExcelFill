@@ -54,7 +54,7 @@ Cada fluxo define:
 | Campo | Descrição |
 |-------|-----------|
 | Nome | Identificação do fluxo |
-| Arquivo esperado | Nome exato do arquivo na pasta monitorada |
+| Arquivo esperado | Nome exato ou com wildcards (`*`, `?`) na pasta monitorada |
 | Pasta do Excel | Onde criar/atualizar a planilha |
 | Nome do Excel | Nome do arquivo `.xlsx` |
 | Colunas | Cabeçalho gravado quando a aba do mês é nova ou vazia |
@@ -62,6 +62,19 @@ Cada fluxo define:
 ### Aba do mês
 
 A aba usada segue o padrão `Julho 2026` (mês em português + ano). Se a aba não existir ou estiver vazia, o cabeçalho configurado no fluxo é criado antes de colar os dados.
+
+### Wildcards no arquivo esperado
+
+O campo **Arquivo esperado** aceita padrões com curingas:
+
+| Padrão | Corresponde a |
+|--------|----------------|
+| `relatorio.csv` | Somente esse nome exato |
+| `planilha_alc_*` | `planilha_alc_01.csv`, `planilha_alc_julho.txt`, etc. |
+| `planilha_alc_*.csv` | Arquivos `.csv` com esse prefixo |
+| `dados_????.tsv` | `dados_2026.tsv` (um `?` = um caractere) |
+
+A comparação ignora maiúsculas/minúsculas. Se dois fluxos casarem com o mesmo arquivo, vale o primeiro fluxo ativo na lista.
 
 ## Estrutura
 

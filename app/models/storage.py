@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 from app.models.schema import AppConfig, Flow
+from app.utils.filename_matching import filename_matches_pattern, has_wildcards
 
 
 def app_dir() -> Path:
@@ -47,10 +48,23 @@ def remove_flow(config: AppConfig, flow_id: str) -> AppConfig:
 
 
 def find_flow_by_filename(config: AppConfig, filename: str) -> Optional[Flow]:
-  filename_lower = filename.lower()
   for flow in config.flows:
     if not flow.enabled:
       continue
-    if flow.source_filename.lower() == filename_lower:
+    if filename_matches_pattern(filename, flow.source_filename):
       return flow
   return None
+
+
+def iter_matching_files(folder: Path, pattern: str):
+  """Lista arquivos na pasta que correspondem ao padrão do fluxo."""
+  if not folder.is_dir():
+    return
+  if has_wildcards(pattern):
+    for path in sorted(folder.iterdir()):
+      if path.is_file() and filename_matches_pattern(path.name, pattern):
+        yield path
+    return
+  candidate = folder / pattern
+  if candidate.is_file():
+    yield candidate

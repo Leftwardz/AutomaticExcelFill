@@ -10,7 +10,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from app.models.schema import AppConfig, Flow
-from app.models.storage import find_flow_by_filename, load_config
+from app.models.storage import find_flow_by_filename, iter_matching_files, load_config
 from app.services.excel_service import append_csv_to_excel, excel_full_path
 
 
@@ -148,8 +148,8 @@ class FolderWatcher:
     for flow in config.flows:
       if not flow.enabled:
         continue
-      candidate = folder / flow.source_filename
-      if candidate.is_file() and self._handler is not None:
-        self._handler._process_file(candidate)
+      for candidate in iter_matching_files(folder, flow.source_filename):
+        if self._handler is not None:
+          self._handler._process_file(candidate)
       if self._stop_event.is_set():
         return
