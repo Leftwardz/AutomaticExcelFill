@@ -1,0 +1,47 @@
+{
+  "default": "slate",
+  "presets": {
+    "purple": {
+      "sidebar": "#1a1033",
+      "bg": "#12151f",
+      "card": "#1e2433",
+      "card_border": "#2d3548",
+      "accent": "#7c3aed",
+      "accent_hover": "#6d28d9",
+      "accent_secondary": "#4f6ef7",
+      "nav_active": "#261845",
+      "text_secondary": "#8b95a5",
+      "progress_bg": "#2d1b4e",
+      "destructive": "#732425",
+      "destructive_hover": "#4a191a",
+      "icon": "#a78bfa",
+      "nav_text_accent": "#c4b5fd",
+      "gradient_hover": "#4338ca",
+      "table_row_a": "#1a1d28",
+      "table_row_b": "#12151f",
+      "canvas_bg": "#2a3142",
+      "error_text": "#f87171"
+    },
+    "slate": {
+      "sidebar": "#18181b",
+      "bg": "#111113",
+      "card": "#1c1c1f",
+      "card_border": "#2e2e33",
+      "accent": "#6366f1",
+      "accent_hover": "#4f46e5",
+      "accent_secondary": "#818cf8",
+      "nav_active": "#27272a",
+      "text_secondary": "#9ca3af",
+      "progress_bg": "#1e1b4b",
+      "destructive": "#b91c1c",
+      "destructive_hover": "#7f1d1d",
+      "icon": "#a5b4fc",
+      "nav_text_accent": "#c7d2fe",
+      "gradient_hover": "#4338ca",
+      "table_row_a": "#1a1a1d",
+      "table_row_b": "#111113",
+      "canvas_bg": "#28282d",
+      "error_text": "#f87171"
+    }
+  }
+}
