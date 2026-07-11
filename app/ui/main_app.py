@@ -252,7 +252,7 @@ class App(ctk.CTk):
     self.flows_tree.heading('source', text='Arquivo esperado')
     self.flows_tree.heading('excel', text='Excel')
     self.flows_tree.heading('headers', text='Colunas')
-    self.flows_tree.heading('password', text='Senha')
+    self.flows_tree.heading('password', text='Edição')
     self.flows_tree.heading('enabled', text='Ativo')
     self.flows_tree.column('name', width=140)
     self.flows_tree.column('source', width=140)

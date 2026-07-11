@@ -82,7 +82,11 @@ class FlowDialog(ctk.CTkToplevel):
     self._source = self._labeled_entry(body, 'Arquivo esperado na pasta', 'Ex.: planilha_alc_* ou relatorio.csv')
     self._excel_dir = self._path_row(body, 'Pasta do Excel', is_directory=True)
     self._excel_name = self._labeled_entry(body, 'Nome do arquivo Excel', 'Ex.: consolidado.xlsx')
-    self._excel_password = self._labeled_entry(body, 'Senha do Excel (opcional)', 'Senha para abrir/salvar o arquivo')
+    self._excel_password = self._labeled_entry(
+      body,
+      'Senha para edição (opcional)',
+      'Abre em leitura sem senha; exige senha para alterar no Excel',
+    )
     self._excel_password.configure(show='*')
     self._header_source = self._excel_file_row(body, 'Excel de referência (cabeçalho)', pick='file')
     self._header_sheet = self._labeled_entry(body, 'Aba do Excel de referência (opcional)', 'Ex.: Julho 2026 — vazio = mês atual')

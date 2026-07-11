@@ -97,8 +97,10 @@ Cada fluxo define:
 | Nome do Excel | Nome do arquivo `.xlsx` |
 | Excel de referência | Caminho opcional de um `.xlsx` existente para carregar o cabeçalho |
 | Aba de referência | Qual aba ler no Excel de referência (vazio = mês atual) |
-| Senha do Excel | Opcional — para arquivos `.xlsx` protegidos por senha ao abrir |
+| Senha para edição | Opcional — abre em leitura no Excel; senha só para alterar células/estrutura |
 | Colunas | Cabeçalho gravado quando a aba do mês é nova ou vazia |
+
+**Senha:** o arquivo **não** fica bloqueado para abrir. Qualquer pessoa pode visualizar; para editar no Excel é preciso informar a senha (Desproteger planilha). O aplicativo continua gravando automaticamente usando a senha configurada no fluxo.
 
 **Colunas:** informe o *Excel de referência* e clique em *Carregar do arquivo de referência*, cole a linha de cabeçalho, ou use *Importar outro Excel*.
 

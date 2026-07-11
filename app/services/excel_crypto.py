@@ -6,8 +6,8 @@ from typing import Optional
 
 import msoffcrypto
 from msoffcrypto.exceptions import InvalidKeyError
-from msoffcrypto.format.ooxml import OOXMLFile
 from openpyxl import Workbook, load_workbook
+from openpyxl.workbook.protection import WorkbookProtection
 from openpyxl.workbook.workbook import Workbook as WorkbookType
 
 
@@ -23,6 +23,24 @@ def is_encrypted_excel(path: Path) -> bool:
     return bool(office_file.is_encrypted())
 
 
+def apply_edit_protection(workbook: WorkbookType, password: str) -> None:
+  """Protege contra edição no Excel; o arquivo abre em leitura sem senha de abertura."""
+  if not password:
+    return
+
+  if workbook.security is None:
+    workbook.security = WorkbookProtection(lockStructure=True, lockWindows=False)
+  else:
+    workbook.security.lockStructure = True
+    workbook.security.lockWindows = False
+  workbook.security.set_workbook_password(password)
+
+  for sheet in workbook.worksheets:
+    sheet.protection.sheet = True
+    sheet.protection.password = password
+    sheet.protection.enable()
+
+
 def load_workbook_from_path(path: Path, password: Optional[str] = None) -> WorkbookType:
   if not path.is_file():
     raise FileNotFoundError(str(path))
@@ -32,7 +50,8 @@ def load_workbook_from_path(path: Path, password: Optional[str] = None) -> Workb
     if office_file.is_encrypted():
       if not password:
         raise ExcelPasswordError(
-          'O arquivo Excel está protegido por senha. Informe a senha no cadastro do fluxo.',
+          'Este Excel foi salvo com senha de abertura (formato antigo). '
+          'Informe a senha no fluxo ou salve novamente a partir do app para usar somente senha de edição.',
         )
       try:
         office_file.load_key(password=password)
@@ -51,17 +70,9 @@ def load_workbook_from_path(path: Path, password: Optional[str] = None) -> Workb
 
 def save_workbook_to_path(workbook: WorkbookType, path: Path, password: Optional[str] = None) -> None:
   path.parent.mkdir(parents=True, exist_ok=True)
-  if not password:
-    workbook.save(path)
-    return
-
-  plain_buffer = io.BytesIO()
-  workbook.save(plain_buffer)
-  plain_buffer.seek(0)
-  encrypted_buffer = io.BytesIO()
-  ooxml_file = OOXMLFile(plain_buffer)
-  ooxml_file.encrypt(password, encrypted_buffer)
-  path.write_bytes(encrypted_buffer.getvalue())
+  if password:
+    apply_edit_protection(workbook, password)
+  workbook.save(path)
 
 
 def create_empty_workbook() -> WorkbookType:
