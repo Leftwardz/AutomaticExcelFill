@@ -9,9 +9,12 @@ from openpyxl import load_workbook
 
 from app.models.schema import Flow
 from app.services.excel_service import (
+  HEADER_FILL,
+  HEADER_FONT,
   META_SHEET_NAME,
   ROW_FILL_PURPLE,
   ROW_FILL_WHITE,
+  TEXT_NUMBER_FORMAT,
   append_csv_to_excel,
   current_month_sheet_name,
   read_tab_csv,
@@ -101,6 +104,27 @@ class ExcelServiceTests(unittest.TestCase):
       self.assertEqual(sheet.cell(row=4, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
       self.assertIn(META_SHEET_NAME, workbook.sheetnames)
       self.assertEqual(workbook[META_SHEET_NAME].sheet_state, 'hidden')
+
+  def test_header_style_and_column_width(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      long_value = 'descricao_bem_longa_para_testar_largura_da_coluna'
+      csv_path.write_text(f'ID\t{long_value}\n', encoding='utf-8')
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Código', 'Descrição detalhada']
+      append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
+
+      workbook = load_workbook(excel_path)
+      sheet = workbook['Julho 2026']
+      header = sheet.cell(row=1, column=2)
+      data = sheet.cell(row=2, column=2)
+
+      self.assertEqual(header.fill.fgColor.rgb, HEADER_FILL.fgColor.rgb)
+      self.assertTrue(header.font.bold)
+      self.assertEqual(header.font.color.rgb, HEADER_FONT.color.rgb)
+      self.assertEqual(header.number_format, TEXT_NUMBER_FORMAT)
+      self.assertEqual(data.number_format, TEXT_NUMBER_FORMAT)
+      self.assertGreaterEqual(sheet.column_dimensions['B'].width, len(long_value))
 
 
 class FlowTests(unittest.TestCase):

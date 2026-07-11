@@ -120,6 +120,12 @@ As linhas coladas pelo aplicativo recebem cor de fundo que alterna a cada **dia 
 
 Vários arquivos no **mesmo dia** mantêm a mesma cor. O controle fica em uma aba oculta `__AEF__` dentro do Excel (não altere essa aba manualmente).
 
+### Formatação da planilha
+
+- **Cabeçalho (linha 1):** fundo roxo escuro, texto branco em negrito
+- **Dados:** sempre gravados como texto (não viram número/data no Excel)
+- **Largura das colunas:** ajustada automaticamente para caber o conteúdo (sem cortar o texto visível)
+
 ### Wildcards no arquivo esperado
 
 O campo **Arquivo esperado** aceita padrões com curingas:

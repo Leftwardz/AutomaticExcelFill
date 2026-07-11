@@ -5,7 +5,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.services.excel_crypto import create_empty_workbook, load_workbook_from_path, save_workbook_to_path
@@ -14,6 +15,12 @@ META_SHEET_NAME = '__AEF__'
 ROW_FILL_WHITE = PatternFill(fill_type='solid', fgColor='FFFFFF')
 ROW_FILL_PURPLE = PatternFill(fill_type='solid', fgColor='E9D5FF')
 ROW_FILLS = (ROW_FILL_WHITE, ROW_FILL_PURPLE)
+HEADER_FILL = PatternFill(fill_type='solid', fgColor='6D28D9')
+HEADER_FONT = Font(bold=True, color='FFFFFF')
+TEXT_NUMBER_FORMAT = '@'
+MIN_COLUMN_WIDTH = 8
+MAX_COLUMN_WIDTH = 80
+COLUMN_WIDTH_PADDING = 2
 
 MONTHS_PT = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -49,17 +56,22 @@ def _sheet_is_empty(sheet: Worksheet) -> bool:
   return sheet.max_row == 0
 
 
+def _write_text_cell(sheet: Worksheet, row_index: int, col_index: int, value) -> None:
+  cell = sheet.cell(row=row_index, column=col_index, value='' if value is None else str(value))
+  cell.number_format = TEXT_NUMBER_FORMAT
+
+
 def _ensure_headers(sheet: Worksheet, headers: List[str]) -> None:
   if not headers:
     return
   if _sheet_is_empty(sheet):
     for col_index, header in enumerate(headers, start=1):
-      sheet.cell(row=1, column=col_index, value=header)
+      _write_text_cell(sheet, 1, col_index, header)
     return
   existing = [str(sheet.cell(row=1, column=col).value or '').strip() for col in range(1, sheet.max_column + 1)]
   if not any(existing):
     for col_index, header in enumerate(headers, start=1):
-      sheet.cell(row=1, column=col_index, value=header)
+      _write_text_cell(sheet, 1, col_index, header)
 
 
 def _next_data_row(sheet: Worksheet) -> int:
@@ -136,6 +148,30 @@ def _apply_row_fill(sheet: Worksheet, row_index: int, fill: PatternFill, column_
     sheet.cell(row=row_index, column=col_index).fill = fill
 
 
+def _apply_header_style(sheet: Worksheet, column_count: int) -> None:
+  for col_index in range(1, column_count + 1):
+    cell = sheet.cell(row=1, column=col_index)
+    if cell.value is None or str(cell.value).strip() == '':
+      continue
+    cell.fill = HEADER_FILL
+    cell.font = HEADER_FONT
+    cell.number_format = TEXT_NUMBER_FORMAT
+
+
+def _autofit_column_widths(sheet: Worksheet, column_count: int) -> None:
+  for col_index in range(1, column_count + 1):
+    max_len = 0
+    for row_index in range(1, sheet.max_row + 1):
+      value = sheet.cell(row=row_index, column=col_index).value
+      if value is not None:
+        max_len = max(max_len, len(str(value)))
+    width = min(max(max_len + COLUMN_WIDTH_PADDING, MIN_COLUMN_WIDTH), MAX_COLUMN_WIDTH)
+    col_letter = get_column_letter(col_index)
+    current_width = sheet.column_dimensions[col_letter].width or 0
+    if width > current_width:
+      sheet.column_dimensions[col_letter].width = width
+
+
 def append_csv_to_excel(
   csv_path: Path,
   excel_path: Path,
@@ -176,8 +212,11 @@ def append_csv_to_excel(
   for offset, row in enumerate(rows):
     target_row = start_row + offset
     for col_index, value in enumerate(row, start=1):
-      sheet.cell(row=target_row, column=col_index, value=value)
+      _write_text_cell(sheet, target_row, col_index, value)
     _apply_row_fill(sheet, target_row, row_fill, fill_column_count)
+
+  _apply_header_style(sheet, fill_column_count)
+  _autofit_column_widths(sheet, fill_column_count)
 
   _write_day_color_state(meta_sheet, sheet_name, process_date, color_index)
 
