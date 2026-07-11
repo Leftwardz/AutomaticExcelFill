@@ -21,6 +21,27 @@ TEXT_NUMBER_FORMAT = '@'
 MIN_COLUMN_WIDTH = 8
 MAX_COLUMN_WIDTH = 80
 COLUMN_WIDTH_PADDING = 2
+DATA_START_ROW = 2
+
+
+class DuplicateRowError(ValueError):
+  def __init__(
+    self,
+    incoming_row_number: int,
+    matching_row_number: int,
+    row_values: List[str],
+    *,
+    matching_source: str = 'planilha',
+  ):
+    self.incoming_row_number = incoming_row_number
+    self.matching_row_number = matching_row_number
+    self.row_values = row_values
+    self.matching_source = matching_source
+    values = ' | '.join(row_values)
+    super().__init__(
+      f'Linha {incoming_row_number} duplicada (igual à linha {matching_row_number} '
+      f'da {matching_source}): {values}'
+    )
 
 MONTHS_PT = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -158,6 +179,58 @@ def _apply_header_style(sheet: Worksheet, column_count: int) -> None:
     cell.number_format = TEXT_NUMBER_FORMAT
 
 
+def _normalize_row_values(row: List[str], column_count: int) -> Tuple[str, ...]:
+  values: List[str] = []
+  for col_index in range(column_count):
+    if col_index < len(row):
+      values.append(str(row[col_index]).strip())
+    else:
+      values.append('')
+  return tuple(values)
+
+
+def _row_values_from_sheet(sheet: Worksheet, row_index: int, column_count: int) -> Tuple[str, ...]:
+  values: List[str] = []
+  for col_index in range(1, column_count + 1):
+    values.append(str(sheet.cell(row=row_index, column=col_index).value or '').strip())
+  return tuple(values)
+
+
+def _row_is_blank(values: Tuple[str, ...]) -> bool:
+  return not any(values)
+
+
+def _validate_no_duplicate_rows(
+  sheet: Worksheet,
+  new_rows: List[List[str]],
+  column_count: int,
+  *,
+  start_row: int,
+) -> None:
+  known_rows: dict[Tuple[str, ...], Tuple[int, str]] = {}
+
+  for row_index in range(DATA_START_ROW, sheet.max_row + 1):
+    values = _row_values_from_sheet(sheet, row_index, column_count)
+    if _row_is_blank(values):
+      continue
+    known_rows[values] = (row_index, 'planilha')
+
+  for offset, row in enumerate(new_rows):
+    values = _normalize_row_values(row, column_count)
+    if _row_is_blank(values):
+      continue
+    incoming_row_number = offset + 1
+    if values in known_rows:
+      matching_row_number, matching_source = known_rows[values]
+      raise DuplicateRowError(
+        incoming_row_number,
+        matching_row_number,
+        list(values),
+        matching_source=matching_source,
+      )
+    known_rows[values] = (incoming_row_number, 'mesmo arquivo')
+
+
 def _autofit_column_widths(sheet: Worksheet, column_count: int) -> None:
   for col_index in range(1, column_count + 1):
     max_len = 0
@@ -208,6 +281,13 @@ def append_csv_to_excel(
   color_index = _resolve_row_color_index(last_date, process_date, color_index)
   row_fill = ROW_FILLS[color_index]
   fill_column_count = _row_fill_column_count(sheet, headers, rows)
+
+  _validate_no_duplicate_rows(
+    sheet,
+    rows,
+    fill_column_count,
+    start_row=start_row,
+  )
 
   for offset, row in enumerate(rows):
     target_row = start_row + offset

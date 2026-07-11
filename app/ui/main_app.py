@@ -327,6 +327,38 @@ class App(ctk.CTk):
     self.entry_processed_subfolder.pack(side='left', padx=(8, 0))
     self.entry_processed_subfolder.insert(0, self.config_data.processed_subfolder)
 
+    self.chk_move_failed = ctk.CTkCheckBox(
+      options_body,
+      text='Mover arquivos com falha (duplicata) para subpasta',
+      text_color='white',
+      fg_color=THEME_ACCENT,
+      hover_color=THEME_ACCENT_HOVER,
+    )
+    self.chk_move_failed.pack(anchor='w', pady=4)
+    if self.config_data.move_failed_files:
+      self.chk_move_failed.select()
+
+    failed_row = ctk.CTkFrame(options_body, fg_color='transparent')
+    failed_row.pack(fill='x', pady=(4, 0))
+    ctk.CTkLabel(failed_row, text='Subpasta de falhas:', text_color=THEME_TEXT_SECONDARY).pack(side='left')
+    self.entry_failed_subfolder = ctk.CTkEntry(failed_row, width=180, **_entry_kwargs())
+    self.entry_failed_subfolder.pack(side='left', padx=(8, 0))
+    self.entry_failed_subfolder.insert(0, self.config_data.failed_subfolder)
+
+    log_row = ctk.CTkFrame(options_body, fg_color='transparent')
+    log_row.pack(fill='x', pady=(8, 0))
+    ctk.CTkLabel(log_row, text='Log compartilhado:', text_color=THEME_TEXT_SECONDARY).pack(side='left')
+    self.entry_shared_log_path = ctk.CTkEntry(log_row, **_entry_kwargs())
+    self.entry_shared_log_path.pack(side='left', fill='x', expand=True, padx=(8, 0))
+    placeholder = 'Padrão: pasta monitorada / automatic_fill.log'
+    if self.config_data.shared_log_path:
+      self.entry_shared_log_path.insert(0, self.config_data.shared_log_path)
+    else:
+      self.entry_shared_log_path.insert(0, placeholder)
+      self.entry_shared_log_path.configure(text_color=THEME_TEXT_SECONDARY)
+      self.entry_shared_log_path.bind('<FocusIn>', self._clear_shared_log_placeholder)
+      self.entry_shared_log_path.bind('<FocusOut>', self._restore_shared_log_placeholder)
+
     ctk.CTkButton(
       scroll,
       text='Salvar configurações',
@@ -358,11 +390,27 @@ class App(ctk.CTk):
       self.entry_watch_folder.delete(0, 'end')
       self.entry_watch_folder.insert(0, path)
 
+  def _clear_shared_log_placeholder(self, _event=None):
+    if self.entry_shared_log_path.get().startswith('Padrão:'):
+      self.entry_shared_log_path.delete(0, 'end')
+      self.entry_shared_log_path.configure(text_color='white')
+
+  def _restore_shared_log_placeholder(self, _event=None):
+    if not self.entry_shared_log_path.get().strip():
+      self.entry_shared_log_path.insert(0, 'Padrão: pasta monitorada / automatic_fill.log')
+      self.entry_shared_log_path.configure(text_color=THEME_TEXT_SECONDARY)
+
   def _save_settings(self):
     self.config_data.watch_folder = self.entry_watch_folder.get().strip()
     self.config_data.auto_start_watcher = bool(self.chk_auto_start.get())
     self.config_data.move_processed_files = bool(self.chk_move_processed.get())
     self.config_data.processed_subfolder = self.entry_processed_subfolder.get().strip() or 'processados'
+    self.config_data.move_failed_files = bool(self.chk_move_failed.get())
+    self.config_data.failed_subfolder = self.entry_failed_subfolder.get().strip() or 'falhas'
+    shared_log = self.entry_shared_log_path.get().strip()
+    if shared_log.startswith('Padrão:'):
+      shared_log = ''
+    self.config_data.shared_log_path = shared_log
     save_config(self.config_data)
     self._refresh_status()
     self._add_log('info', 'Configurações salvas.')

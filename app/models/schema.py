@@ -44,6 +44,9 @@ class AppConfig:
   auto_start_watcher: bool = True
   move_processed_files: bool = True
   processed_subfolder: str = 'processados'
+  move_failed_files: bool = True
+  failed_subfolder: str = 'falhas'
+  shared_log_path: str = ''
   flows: List[Flow] = field(default_factory=list)
 
   def to_dict(self) -> dict:
@@ -53,6 +56,9 @@ class AppConfig:
       'auto_start_watcher': self.auto_start_watcher,
       'move_processed_files': self.move_processed_files,
       'processed_subfolder': self.processed_subfolder,
+      'move_failed_files': self.move_failed_files,
+      'failed_subfolder': self.failed_subfolder,
+      'shared_log_path': self.shared_log_path,
       'flows': [flow.to_dict() for flow in self.flows],
     }
 
@@ -65,5 +71,8 @@ class AppConfig:
       auto_start_watcher=bool(data.get('auto_start_watcher', True)),
       move_processed_files=bool(data.get('move_processed_files', True)),
       processed_subfolder=data.get('processed_subfolder', 'processados'),
+      move_failed_files=bool(data.get('move_failed_files', True)),
+      failed_subfolder=data.get('failed_subfolder', 'falhas'),
+      shared_log_path=data.get('shared_log_path', ''),
       flows=flows,
     )

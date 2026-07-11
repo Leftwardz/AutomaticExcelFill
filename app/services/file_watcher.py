@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 import time
 from pathlib import Path
@@ -11,7 +12,9 @@ from watchdog.observers import Observer
 
 from app.models.schema import AppConfig, Flow
 from app.models.storage import find_flow_by_filename, iter_matching_files, load_config
-from app.services.excel_service import append_csv_to_excel, excel_full_path
+from app.services.coordination import LockNotAcquired, exclusive_lock, locks_root
+from app.services.excel_service import DuplicateRowError, append_csv_to_excel, excel_full_path
+from app.services.job_log import append_job_log, resolve_shared_log_path
 
 
 LogCallback = Callable[[str, str], None]
@@ -71,28 +74,85 @@ class _CsvHandler(FileSystemEventHandler):
     if flow is None:
       return
 
+    watch_folder = (config.watch_folder or '').strip()
+    if not watch_folder:
+      self._on_log('error', f'[{flow.name}] Pasta de monitoramento não configurada.')
+      return
+
+    lock_dir = locks_root(watch_folder)
+    csv_lock_name = path.name
+    excel_path = excel_full_path(flow.excel_directory, flow.excel_filename)
+    excel_lock_name = hashlib.sha256(str(excel_path.resolve()).encode('utf-8')).hexdigest()
+    log_path = resolve_shared_log_path(config)
+
     try:
-      excel_path = excel_full_path(flow.excel_directory, flow.excel_filename)
-      sheet_name, row_count = append_csv_to_excel(
-        path,
-        excel_path,
-        flow.headers,
-        excel_password=flow.excel_password or None,
+      with exclusive_lock(lock_dir, 'csv', csv_lock_name):
+        if not path.is_file():
+          return
+        with exclusive_lock(lock_dir, 'excel', excel_lock_name):
+          sheet_name, row_count = append_csv_to_excel(
+            path,
+            excel_path,
+            flow.headers,
+            excel_password=flow.excel_password or None,
+          )
+    except LockNotAcquired:
+      self._on_log('info', f'[{flow.name}] {path.name} ignorado — outro computador está processando.')
+      return
+    except DuplicateRowError as exc:
+      message = str(exc)
+      self._on_log('error', f'[{flow.name}] {path.name}: {message}')
+      append_job_log(
+        log_path,
+        'error',
+        message,
+        flow_name=flow.name,
+        source_file=path.name,
       )
-      self._on_log(
-        'success',
-        f'[{flow.name}] {path.name} → {excel_path.name} / aba "{sheet_name}" (+{row_count} linhas)',
-      )
-      self._archive_source(path, config)
-      if self._on_processed:
-        self._on_processed(flow, path, sheet_name, row_count)
+      self._archive_failed(path, config)
+      return
     except Exception as exc:
-      self._on_log('error', f'[{flow.name}] Erro ao processar {path.name}: {exc}')
+      message = f'Erro ao processar {path.name}: {exc}'
+      self._on_log('error', f'[{flow.name}] {message}')
+      append_job_log(
+        log_path,
+        'error',
+        message,
+        flow_name=flow.name,
+        source_file=path.name,
+      )
+      return
+
+    success_message = (
+      f'{path.name} → {excel_path.name} / aba "{sheet_name}" (+{row_count} linhas)'
+    )
+    self._on_log('success', f'[{flow.name}] {success_message}')
+    append_job_log(
+      log_path,
+      'success',
+      success_message,
+      flow_name=flow.name,
+      source_file=path.name,
+    )
+    self._archive_source(path, config)
+    if self._on_processed:
+      self._on_processed(flow, path, sheet_name, row_count)
 
   def _archive_source(self, path: Path, config: AppConfig) -> None:
     if not config.move_processed_files:
       return
     target_dir = path.parent / config.processed_subfolder
+    target_dir.mkdir(parents=True, exist_ok=True)
+    destination = target_dir / path.name
+    if destination.exists():
+      stamp = time.strftime('%Y%m%d_%H%M%S')
+      destination = target_dir / f'{path.stem}_{stamp}{path.suffix}'
+    shutil.move(str(path), str(destination))
+
+  def _archive_failed(self, path: Path, config: AppConfig) -> None:
+    if not config.move_failed_files or not path.is_file():
+      return
+    target_dir = path.parent / config.failed_subfolder
     target_dir.mkdir(parents=True, exist_ok=True)
     destination = target_dir / path.name
     if destination.exists():

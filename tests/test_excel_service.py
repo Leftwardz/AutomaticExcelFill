@@ -126,6 +126,31 @@ class ExcelServiceTests(unittest.TestCase):
       self.assertEqual(data.number_format, TEXT_NUMBER_FORMAT)
       self.assertGreaterEqual(sheet.column_dimensions['B'].width, len(long_value))
 
+  def test_duplicate_row_in_existing_sheet_raises(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Col1', 'Col2']
+
+      csv_path.write_text('A\tB\n', encoding='utf-8')
+      append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
+
+      csv_path.write_text('A\tB\n', encoding='utf-8')
+      with self.assertRaises(Exception) as ctx:
+        append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
+      self.assertIn('duplicada', str(ctx.exception).lower())
+
+  def test_duplicate_row_within_same_file_raises(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Col1', 'Col2']
+      csv_path.write_text('A\tB\nA\tB\n', encoding='utf-8')
+
+      with self.assertRaises(Exception) as ctx:
+        append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
+      self.assertIn('mesmo arquivo', str(ctx.exception).lower())
+
 
 class FlowTests(unittest.TestCase):
   def test_roundtrip(self):

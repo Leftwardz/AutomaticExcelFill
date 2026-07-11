@@ -139,6 +139,26 @@ O campo **Arquivo esperado** aceita padrões com curingas:
 
 A comparação ignora maiúsculas/minúsculas. Se dois fluxos casarem com o mesmo arquivo, vale o primeiro fluxo ativo na lista.
 
+### Dois computadores na mesma pasta
+
+Para evitar que os dois processem o mesmo arquivo ou gravem no Excel ao mesmo tempo:
+
+- O app cria locks em `{pasta monitorada}/.automatic_fill_locks/`
+- Quem conseguir o lock do **arquivo CSV** primeiro processa; o outro ignora com mensagem no monitor
+- O lock do **Excel** garante gravação sequencial na mesma planilha
+
+Use a **mesma pasta monitorada** e o **mesmo caminho de rede** para Excel e `config.json` nos dois PCs.
+
+### Linhas duplicadas
+
+Antes de colar, o app compara cada linha nova com as que já existem na aba (e com as outras linhas do mesmo arquivo). Se encontrar uma linha **idêntica**:
+
+- O job **falha** e **nada é gravado** na planilha
+- O arquivo vai para a subpasta **`falhas`** (configurável)
+- Um registro é escrito no **log compartilhado** (`automatic_fill.log` na pasta monitorada, ou caminho customizado)
+
+O log inclui data/hora, computador, fluxo, arquivo e motivo — visível nos dois PCs se estiver numa pasta de rede.
+
 ## Estrutura
 
 ```
