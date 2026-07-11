@@ -86,6 +86,14 @@ class FlowDialog(ctk.CTkToplevel):
       'Senha para modificar no Excel',
     )
     self._excel_password.configure(show='*')
+    self._enabled = ctk.CTkCheckBox(
+      body,
+      text='Fluxo ativo (monitorar este arquivo)',
+      text_color='white',
+      fg_color=THEME_ACCENT,
+      hover_color=THEME_ACCENT_HOVER,
+    )
+    self._enabled.pack(anchor='w', pady=(0, 8))
     self._headers_block(body)
 
     footer = ctk.CTkFrame(self, fg_color='transparent')
@@ -213,6 +221,8 @@ class FlowDialog(ctk.CTkToplevel):
     self._excel_dir.insert(0, self._flow.excel_directory)
     self._excel_name.insert(0, self._flow.excel_filename)
     self._excel_password.insert(0, self._flow.excel_password)
+    if self._flow.enabled:
+      self._enabled.select()
     if self._flow.headers:
       self._set_headers_text(self._flow.headers)
     else:
@@ -238,6 +248,7 @@ class FlowDialog(ctk.CTkToplevel):
     self._flow.excel_directory = excel_dir
     self._flow.excel_filename = excel_name
     self._flow.excel_password = excel_password
+    self._flow.enabled = bool(self._enabled.get())
     self._flow.header_source_path = ''
     self._flow.header_source_sheet = ''
     self._flow.headers = headers

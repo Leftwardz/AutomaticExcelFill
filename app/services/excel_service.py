@@ -64,14 +64,31 @@ def excel_full_path(directory: str, filename: str, when: datetime | None = None)
   return excel_year_directory(directory, when) / name
 
 
+CSV_ENCODINGS = ('utf-8-sig', 'utf-8', 'cp1252', 'latin-1')
+
+
 def read_tab_csv(path: Path) -> List[List[str]]:
+  raw = path.read_bytes()
+  last_error: UnicodeDecodeError | None = None
+  text: str | None = None
+
+  for encoding in CSV_ENCODINGS:
+    try:
+      text = raw.decode(encoding)
+      break
+    except UnicodeDecodeError as exc:
+      last_error = exc
+
+  if text is None:
+    raise ValueError(
+      f'Não foi possível decodificar {path.name}. Tentativas: {", ".join(CSV_ENCODINGS)}.'
+    ) from last_error
+
   rows: List[List[str]] = []
-  with open(path, encoding='utf-8-sig', newline='') as f:
-    reader = csv.reader(f, delimiter='\t')
-    for row in reader:
-      if not row or all(not cell.strip() for cell in row):
-        continue
-      rows.append([cell.strip() for cell in row])
+  for row in csv.reader(text.splitlines(), delimiter='\t'):
+    if not row or all(not cell.strip() for cell in row):
+      continue
+    rows.append([cell.strip() for cell in row])
   return rows
 
 

@@ -9,13 +9,19 @@ from typing import Iterator
 
 
 class LockNotAcquired(Exception):
-  def __init__(self, resource: str):
+  def __init__(self, resource: str, owner: str = ''):
     self.resource = resource
-    super().__init__(f'Recurso já em uso por outro processo: {resource}')
+    self.owner = owner
+    message = f'Recurso já em uso por outro processo: {resource}'
+    if owner:
+      message = f'{message} — {owner}'
+    super().__init__(message)
 
 
 LOCK_DIR_NAME = '.automatic_fill_locks'
-DEFAULT_STALE_SECONDS = 1800
+DEFAULT_STALE_SECONDS = 600
+CSV_STALE_SECONDS = 300
+EXCEL_STALE_SECONDS = 600
 
 
 def locks_root(watch_folder: str | Path) -> Path:
@@ -33,9 +39,52 @@ def _lock_path(lock_dir: Path, category: str, name: str) -> Path:
   return category_dir / f'{_safe_lock_name(name)}.lock'
 
 
+def _parse_lock_file(lock_path: Path) -> dict[str, str]:
+  try:
+    content = lock_path.read_text(encoding='utf-8')
+  except OSError:
+    return {}
+  data: dict[str, str] = {}
+  for line in content.splitlines():
+    if '=' not in line:
+      continue
+    key, value = line.split('=', 1)
+    data[key.strip()] = value.strip()
+  return data
+
+
+def read_lock_owner(lock_path: Path) -> str:
+  data = _parse_lock_file(lock_path)
+  host = data.get('host', '')
+  pid = data.get('pid', '')
+  if host and pid:
+    return f'{host} (pid {pid})'
+  if host:
+    return host
+  return 'outro processo'
+
+
+def _is_process_alive(pid: int) -> bool:
+  if pid <= 0:
+    return False
+  try:
+    os.kill(pid, 0)
+  except OSError:
+    return False
+  return True
+
+
 def _maybe_remove_stale(lock_path: Path, stale_seconds: float) -> None:
   if not lock_path.is_file():
     return
+
+  data = _parse_lock_file(lock_path)
+  pid_text = data.get('pid', '')
+  if pid_text.isdigit():
+    if not _is_process_alive(int(pid_text)):
+      lock_path.unlink(missing_ok=True)
+      return
+
   try:
     age = time.time() - lock_path.stat().st_mtime
     if age > stale_seconds:
@@ -67,7 +116,8 @@ def exclusive_lock(
     try:
       _write_lock_file(lock_path)
     except FileExistsError as exc:
-      raise LockNotAcquired(name) from exc
+      owner = read_lock_owner(lock_path)
+      raise LockNotAcquired(name, owner) from exc
     acquired = True
     yield
   finally:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import os
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Optional
@@ -102,9 +104,17 @@ def load_workbook_from_path(path: Path, password: Optional[str] = None) -> Workb
 
 def save_workbook_to_path(workbook: WorkbookType, path: Path, password: Optional[str] = None) -> None:
   path.parent.mkdir(parents=True, exist_ok=True)
-  workbook.save(path)
-  if password:
-    _inject_windows_modify_password(path, password)
+  fd, tmp_name = tempfile.mkstemp(suffix='.xlsx.tmp', dir=path.parent)
+  os.close(fd)
+  tmp_path = Path(tmp_name)
+  try:
+    workbook.save(tmp_path)
+    if password:
+      _inject_windows_modify_password(tmp_path, password)
+    os.replace(tmp_path, path)
+  except Exception:
+    tmp_path.unlink(missing_ok=True)
+    raise
 
 
 def create_empty_workbook() -> WorkbookType:

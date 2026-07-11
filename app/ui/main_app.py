@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import customtkinter as ctk
+from pathlib import Path
 from tkinter import filedialog, ttk
 
 from app.models.schema import AppConfig, Flow
 from app.models.storage import load_config, remove_flow, save_config, upsert_flow
 from app.services.file_watcher import FolderWatcher
+from app.services.job_log import read_job_log_tail, resolve_shared_log_path
 from app.ui.constants import (
   APP_NAME,
   BTN_HOVER_RED,
@@ -200,8 +202,20 @@ class App(ctk.CTk):
       **_secondary_btn_kwargs(height=36),
     )
     self.btn_stop.pack(side='left', padx=(8, 0))
+    ctk.CTkButton(
+      controls,
+      text='Processar arquivo...',
+      command=self._process_file_manual,
+      **_secondary_btn_kwargs(height=36),
+    ).pack(side='left', padx=(8, 0))
+    ctk.CTkButton(
+      controls,
+      text='Atualizar log compartilhado',
+      command=self._refresh_shared_log,
+      **_secondary_btn_kwargs(height=36),
+    ).pack(side='left', padx=(8, 0))
 
-    log_card, log_body = _section_card(self.monitor_view, 'Log de atividades')
+    log_card, log_body = _section_card(self.monitor_view, 'Log desta sessão')
     log_card.grid(row=1, column=0, sticky='nsew', pady=(12, 0))
     self.monitor_view.grid_rowconfigure(1, weight=1)
 
@@ -216,6 +230,22 @@ class App(ctk.CTk):
     )
     self.log_box.pack(fill='both', expand=True)
     self.log_box.configure(state='disabled')
+
+    shared_card, shared_body = _section_card(self.monitor_view, 'Log compartilhado (rede)')
+    shared_card.grid(row=2, column=0, sticky='nsew', pady=(12, 0))
+    self.monitor_view.grid_rowconfigure(2, weight=1)
+
+    self.shared_log_box = ctk.CTkTextbox(
+      shared_body,
+      fg_color=THEME_BG,
+      border_color=THEME_CARD_BORDER,
+      border_width=1,
+      corner_radius=8,
+      text_color='white',
+      font=(FONT, 11),
+    )
+    self.shared_log_box.pack(fill='both', expand=True)
+    self.shared_log_box.configure(state='disabled')
 
   def _build_flows_view(self):
     top = ctk.CTkFrame(self.flows_view, fg_color='transparent')
@@ -269,6 +299,12 @@ class App(ctk.CTk):
     actions = ctk.CTkFrame(self.flows_view, fg_color='transparent')
     actions.grid(row=2, column=0, sticky='ew', pady=(8, 0))
     ctk.CTkButton(actions, text='Editar', command=self._edit_flow, **_secondary_btn_kwargs()).pack(side='left')
+    ctk.CTkButton(
+      actions,
+      text='Ativar/Desativar',
+      command=self._toggle_flow_enabled,
+      **_secondary_btn_kwargs(),
+    ).pack(side='left', padx=(8, 0))
     ctk.CTkButton(
       actions,
       text='Excluir',
@@ -329,7 +365,7 @@ class App(ctk.CTk):
 
     self.chk_move_failed = ctk.CTkCheckBox(
       options_body,
-      text='Mover arquivos com falha (duplicata) para subpasta',
+      text='Mover arquivos com falha para subpasta',
       text_color='white',
       fg_color=THEME_ACCENT,
       hover_color=THEME_ACCENT_HOVER,
@@ -378,6 +414,7 @@ class App(ctk.CTk):
     self.settings_view.grid_remove()
     if name == 'monitor':
       self.monitor_view.grid()
+      self._refresh_shared_log()
     elif name == 'flows':
       self.flows_view.grid()
       self._reload_flows_table()
@@ -401,6 +438,8 @@ class App(ctk.CTk):
       self.entry_shared_log_path.configure(text_color=THEME_TEXT_SECONDARY)
 
   def _save_settings(self):
+    was_running = self.watcher.is_running
+    previous_folder = self.config_data.watch_folder
     self.config_data.watch_folder = self.entry_watch_folder.get().strip()
     self.config_data.auto_start_watcher = bool(self.chk_auto_start.get())
     self.config_data.move_processed_files = bool(self.chk_move_processed.get())
@@ -412,8 +451,21 @@ class App(ctk.CTk):
       shared_log = ''
     self.config_data.shared_log_path = shared_log
     save_config(self.config_data)
+    self.config_data = load_config()
     self._refresh_status()
     self._add_log('info', 'Configurações salvas.')
+    if was_running:
+      self.watcher.stop()
+      if self.config_data.watch_folder:
+        try:
+          self.watcher.start(self.config_data.watch_folder)
+          self.lbl_status.configure(text='Monitorando', text_color='#86efac')
+          if previous_folder != self.config_data.watch_folder:
+            self._add_log('info', 'Monitoramento reiniciado na nova pasta.')
+        except Exception as exc:
+          self._add_log('error', f'Não foi possível reiniciar o monitoramento: {exc}')
+      else:
+        self.lbl_status.configure(text='Parado', text_color='white')
 
   def _selected_flow(self) -> Flow | None:
     selected = self.flows_tree.selection()
@@ -454,6 +506,18 @@ class App(ctk.CTk):
       return
     FlowDialog(self, flow=Flow.from_dict(flow.to_dict()), on_save=self._persist_flow)
 
+  def _toggle_flow_enabled(self):
+    flow = self._selected_flow()
+    if flow is None:
+      self._add_log('error', 'Selecione um fluxo.')
+      return
+    flow.enabled = not flow.enabled
+    self.config_data = upsert_flow(self.config_data, flow)
+    save_config(self.config_data)
+    self._reload_flows_table()
+    state = 'ativado' if flow.enabled else 'desativado'
+    self._add_log('info', f'Fluxo {state}: {flow.name}')
+
   def _delete_flow(self):
     flow = self._selected_flow()
     if flow is None:
@@ -491,6 +555,35 @@ class App(ctk.CTk):
     folder = self.config_data.watch_folder or 'Nenhuma pasta configurada'
     self.lbl_watch_folder.configure(text=folder)
 
+  def _process_file_manual(self):
+    path = filedialog.askopenfilename(
+      parent=self,
+      title='Selecionar arquivo para processar',
+      filetypes=[
+        ('Arquivos de dados', '*.csv *.txt *.tsv'),
+        ('Todos os arquivos', '*.*'),
+      ],
+    )
+    if not path:
+      return
+    self._add_log('info', f'Processamento manual: {Path(path).name}')
+    self.watcher.process_file_now(Path(path))
+    self._refresh_shared_log()
+
+  def _refresh_shared_log(self):
+    log_path = resolve_shared_log_path(self.config_data)
+    content = read_job_log_tail(log_path)
+    header = f'Arquivo: {log_path}\n{"—" * 48}\n'
+
+    def apply():
+      self.shared_log_box.configure(state='normal')
+      self.shared_log_box.delete('1.0', 'end')
+      self.shared_log_box.insert('1.0', header + content)
+      self.shared_log_box.see('end')
+      self.shared_log_box.configure(state='disabled')
+
+    self.after(0, apply)
+
   def _add_log(self, level: str, message: str):
     prefix = {'info': 'ℹ', 'success': '✓', 'error': '✗'}.get(level, '•')
 
@@ -501,6 +594,8 @@ class App(ctk.CTk):
       self.log_box.configure(state='disabled')
 
     self.after(0, append)
+    if level in ('success', 'error'):
+      self.after(200, self._refresh_shared_log)
 
   def _on_close(self):
     self.watcher.stop()
