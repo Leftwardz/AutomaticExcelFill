@@ -5,7 +5,15 @@ from pathlib import Path
 from tkinter import filedialog, ttk
 
 from app.models.schema import AppConfig, Flow
-from app.models.storage import load_config, remove_flow, save_config, upsert_flow
+from app.models.storage import (
+  active_config_path,
+  load_config,
+  read_shared_config,
+  remove_flow,
+  save_config,
+  shared_config_path,
+  upsert_flow,
+)
 from app.services.file_watcher import FolderWatcher
 from app.services.job_log import read_job_log_tail, resolve_shared_log_path
 from app.ui.constants import (
@@ -307,6 +315,12 @@ class App(ctk.CTk):
     ).pack(side='left', padx=(8, 0))
     ctk.CTkButton(
       actions,
+      text='Recarregar da rede',
+      command=self._reload_shared_config,
+      **_secondary_btn_kwargs(),
+    ).pack(side='left', padx=(8, 0))
+    ctk.CTkButton(
+      actions,
       text='Excluir',
       command=self._delete_flow,
       fg_color=BTN_RED,
@@ -330,6 +344,25 @@ class App(ctk.CTk):
     self.entry_watch_folder.pack(side='left', fill='x', expand=True)
     self.entry_watch_folder.insert(0, self.config_data.watch_folder)
     ctk.CTkButton(row, text='...', width=40, command=self._browse_watch_folder, **_secondary_btn_kwargs()).pack(side='left', padx=(8, 0))
+
+    self.lbl_config_path = ctk.CTkLabel(
+      body,
+      text='',
+      font=(FONT, 10),
+      text_color=THEME_TEXT_SECONDARY,
+      wraplength=700,
+      justify='left',
+    )
+    self.lbl_config_path.pack(fill='x', pady=(8, 0))
+
+    ctk.CTkLabel(
+      body,
+      text='Use o mesmo caminho de rede nos dois PCs. Fluxos e configurações ficam em config.json dentro dessa pasta.',
+      font=(FONT, 10),
+      text_color=THEME_TEXT_SECONDARY,
+      wraplength=700,
+      justify='left',
+    ).pack(fill='x', pady=(4, 0))
 
     options_card, options_body = _section_card(scroll, 'Comportamento')
     options_card.pack(fill='x', pady=(0, 12))
@@ -405,6 +438,13 @@ class App(ctk.CTk):
       height=36,
     ).pack(anchor='w', pady=(4, 0))
 
+    ctk.CTkButton(
+      scroll,
+      text='Recarregar configuração da rede',
+      command=self._reload_shared_config,
+      **_secondary_btn_kwargs(),
+    ).pack(anchor='w', pady=(8, 0))
+
   def _show_view(self, name: str):
     self._active_view = name
     for key, btn in self._nav_buttons.items():
@@ -417,6 +457,7 @@ class App(ctk.CTk):
       self._refresh_shared_log()
     elif name == 'flows':
       self.flows_view.grid()
+      self._reload_shared_config(quiet=True)
       self._reload_flows_table()
     else:
       self.settings_view.grid()
@@ -437,10 +478,85 @@ class App(ctk.CTk):
       self.entry_shared_log_path.insert(0, 'Padrão: pasta monitorada / automatic_fill.log')
       self.entry_shared_log_path.configure(text_color=THEME_TEXT_SECONDARY)
 
+  def _reload_shared_config(self, *, quiet: bool = False) -> bool:
+    folder = self.entry_watch_folder.get().strip() or (self.config_data.watch_folder or '').strip()
+    loaded = read_shared_config(folder)
+    if loaded is None:
+      if not quiet:
+        if folder:
+          self._add_log('info', f'Nenhuma configuração compartilhada em {shared_config_path(folder)} ainda.')
+        else:
+          self._add_log('error', 'Configure a pasta principal antes de recarregar.')
+      self._refresh_config_path_label()
+      return False
+
+    self.config_data = loaded
+    self._sync_settings_form_from_config()
+    self._reload_flows_table()
+    self._refresh_status()
+    self._refresh_config_path_label()
+    if not quiet:
+      self._add_log('info', f'Configuração recarregada ({len(self.config_data.flows)} fluxos).')
+    return True
+
+  def _sync_settings_form_from_config(self) -> None:
+    self.entry_watch_folder.delete(0, 'end')
+    self.entry_watch_folder.insert(0, self.config_data.watch_folder)
+
+    if self.config_data.auto_start_watcher:
+      self.chk_auto_start.select()
+    else:
+      self.chk_auto_start.deselect()
+
+    if self.config_data.move_processed_files:
+      self.chk_move_processed.select()
+    else:
+      self.chk_move_processed.deselect()
+
+    self.entry_processed_subfolder.delete(0, 'end')
+    self.entry_processed_subfolder.insert(0, self.config_data.processed_subfolder)
+
+    if self.config_data.move_failed_files:
+      self.chk_move_failed.select()
+    else:
+      self.chk_move_failed.deselect()
+
+    self.entry_failed_subfolder.delete(0, 'end')
+    self.entry_failed_subfolder.insert(0, self.config_data.failed_subfolder)
+
+    self.entry_shared_log_path.delete(0, 'end')
+    if self.config_data.shared_log_path:
+      self.entry_shared_log_path.insert(0, self.config_data.shared_log_path)
+      self.entry_shared_log_path.configure(text_color='white')
+    else:
+      self.entry_shared_log_path.insert(0, 'Padrão: pasta monitorada / automatic_fill.log')
+      self.entry_shared_log_path.configure(text_color=THEME_TEXT_SECONDARY)
+
+  def _refresh_config_path_label(self) -> None:
+    folder = self.entry_watch_folder.get().strip() or (self.config_data.watch_folder or '').strip()
+    if folder:
+      path = shared_config_path(folder)
+      self.lbl_config_path.configure(text=f'Configuração compartilhada: {path}')
+    else:
+      path = active_config_path(self.config_data)
+      self.lbl_config_path.configure(text=f'Configuração local: {path}')
+
+  def _ensure_latest_shared_config(self) -> None:
+    folder = self.entry_watch_folder.get().strip() or (self.config_data.watch_folder or '').strip()
+    loaded = read_shared_config(folder)
+    if loaded is not None:
+      self.config_data = loaded
+
   def _save_settings(self):
     was_running = self.watcher.is_running
     previous_folder = self.config_data.watch_folder
-    self.config_data.watch_folder = self.entry_watch_folder.get().strip()
+    watch_folder = self.entry_watch_folder.get().strip()
+
+    loaded = read_shared_config(watch_folder)
+    if loaded is not None:
+      self.config_data = loaded
+
+    self.config_data.watch_folder = watch_folder
     self.config_data.auto_start_watcher = bool(self.chk_auto_start.get())
     self.config_data.move_processed_files = bool(self.chk_move_processed.get())
     self.config_data.processed_subfolder = self.entry_processed_subfolder.get().strip() or 'processados'
@@ -452,7 +568,10 @@ class App(ctk.CTk):
     self.config_data.shared_log_path = shared_log
     save_config(self.config_data)
     self.config_data = load_config()
+    self._sync_settings_form_from_config()
     self._refresh_status()
+    self._refresh_config_path_label()
+    self._reload_flows_table()
     self._add_log('info', 'Configurações salvas.')
     if was_running:
       self.watcher.stop()
@@ -507,6 +626,7 @@ class App(ctk.CTk):
     FlowDialog(self, flow=Flow.from_dict(flow.to_dict()), on_save=self._persist_flow)
 
   def _toggle_flow_enabled(self):
+    self._ensure_latest_shared_config()
     flow = self._selected_flow()
     if flow is None:
       self._add_log('error', 'Selecione um fluxo.')
@@ -519,6 +639,7 @@ class App(ctk.CTk):
     self._add_log('info', f'Fluxo {state}: {flow.name}')
 
   def _delete_flow(self):
+    self._ensure_latest_shared_config()
     flow = self._selected_flow()
     if flow is None:
       self._add_log('error', 'Selecione um fluxo para excluir.')
@@ -529,6 +650,7 @@ class App(ctk.CTk):
     self._add_log('info', f'Fluxo removido: {flow.name}')
 
   def _persist_flow(self, flow: Flow):
+    self._ensure_latest_shared_config()
     self.config_data = upsert_flow(self.config_data, flow)
     save_config(self.config_data)
     self._reload_flows_table()
@@ -554,6 +676,7 @@ class App(ctk.CTk):
   def _refresh_status(self):
     folder = self.config_data.watch_folder or 'Nenhuma pasta configurada'
     self.lbl_watch_folder.configure(text=folder)
+    self._refresh_config_path_label()
 
   def _process_file_manual(self):
     path = filedialog.askopenfilename(

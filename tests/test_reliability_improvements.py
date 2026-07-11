@@ -14,7 +14,7 @@ from app.services.excel_crypto import save_workbook_to_path
 from app.services.excel_service import read_tab_csv
 from app.services.file_stability import wait_for_file_stable
 from app.services.job_log import append_job_log, read_job_log_tail
-from app.models.storage import load_config, save_config
+from app.models.storage import load_config, read_shared_config, save_config
 from app.utils.network_paths import is_likely_network_path
 
 
@@ -68,6 +68,22 @@ class JobLogTests(unittest.TestCase):
 
 
 class StorageTests(unittest.TestCase):
+  def test_read_shared_config_returns_none_when_missing(self):
+    self.assertIsNone(read_shared_config('/tmp/inexistente'))
+
+  def test_read_shared_config_loads_file(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      watch = Path(tmp) / 'monitor'
+      watch.mkdir()
+      shared = watch / 'config.json'
+      shared.write_text(json.dumps({
+        'watch_folder': str(watch),
+        'flows': [{'name': 'A', 'source_filename': 'x.csv', 'excel_directory': '/a', 'excel_filename': 'b.xlsx'}],
+      }), encoding='utf-8')
+      loaded = read_shared_config(str(watch))
+      self.assertIsNotNone(loaded)
+      self.assertEqual(loaded.flows[0].name, 'A')
+
   def test_save_config_writes_shared_and_bootstrap(self):
     with tempfile.TemporaryDirectory() as tmp:
       tmp_path = Path(tmp)

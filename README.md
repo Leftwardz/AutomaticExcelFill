@@ -141,17 +141,40 @@ A comparação ignora maiúsculas/minúsculas. Se dois fluxos casarem com o mesm
 
 ### Dois computadores na mesma pasta
 
-Para evitar que os dois processem o mesmo arquivo ou gravem no Excel ao mesmo tempo:
+#### Como apontar para a mesma configuração (passo a passo)
+
+1. **Crie uma pasta compartilhada na rede** que os dois PCs enxergam, por exemplo:
+   `\\servidor\AutomaticExcelFill`
+2. **No PC 1:** abra *Configurações* → em *Pasta principal* coloque esse caminho → *Salvar configurações*.
+3. **No PC 2:** coloque **exatamente o mesmo caminho** → *Salvar configurações*.
+4. Cadastre os fluxos no PC 1. No PC 2, abra *Fluxos* (recarrega automaticamente) ou clique em *Recarregar da rede*.
+
+O arquivo compartilhado fica em:
+
+```
+\\servidor\AutomaticExcelFill\config.json
+```
+
+Esse arquivo contém **tudo**: pasta monitorada, fluxos, colunas, senhas e opções. Cadastrou um fluxo em um PC → aparece no outro após recarregar.
+
+Ao lado do `.exe` em cada PC fica só um `config.json` mínimo com o caminho da pasta (bootstrap), apontando para o arquivo da rede.
+
+> **Importante:** use o **mesmo texto de caminho** nos dois PCs (`\\servidor\...` ou `Z:\...` se for a mesma unidade mapeada). Caminhos diferentes para a mesma pasta podem parecer pastas distintas para o Windows.
+
+#### Sincronização dos fluxos
+
+- Ao salvar fluxo, configuração ou opções, grava em `{pasta monitorada}/config.json`
+- Ao abrir a aba *Fluxos*, o app **recarrega da rede** automaticamente
+- Botões **Recarregar da rede** (em *Fluxos* e *Configurações*) forçam atualização manual
+- Antes de salvar, o app lê a versão mais recente da rede para não apagar fluxos do outro PC
+
+#### Locks e processamento
 
 - O app cria locks em `{pasta monitorada}/.automatic_fill_locks/`
 - Quem conseguir o lock do **arquivo CSV** primeiro processa; o outro ignora com mensagem no monitor
 - O lock do **Excel** garante gravação sequencial na mesma planilha
 
-Use a **mesma pasta monitorada** nos dois PCs. O `config.json` completo fica em `{pasta monitorada}/config.json`; ao lado do executável fica só um arquivo mínimo com o caminho da pasta (bootstrap).
-
 ### Confiabilidade em rede
-
-- **Polling automático** em caminhos UNC (`\\servidor\pasta`) — mais estável que eventos do sistema em pasta compartilhada
 - **Aguarda cópia terminar** — só processa quando o tamanho do arquivo estabiliza
 - **Gravação atômica** do Excel (arquivo temporário + renomear)
 - **Qualquer falha** (duplicata, senha, encoding, permissão) move o arquivo para `falhas/` quando configurado

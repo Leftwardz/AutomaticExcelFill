@@ -49,6 +49,21 @@ def _atomic_write_json(path: Path, data: dict) -> None:
   os.replace(tmp_path, path)
 
 
+def read_shared_config(watch_folder: str) -> AppConfig | None:
+  folder = (watch_folder or '').strip()
+  if not folder:
+    return None
+  shared = shared_config_path(folder)
+  if not shared.is_file():
+    return None
+  with open(shared, encoding='utf-8') as handle:
+    return AppConfig.from_dict(json.load(handle))
+
+
+def active_config_path(config: AppConfig) -> Path:
+  return resolve_config_path(config.watch_folder)
+
+
 def load_config() -> AppConfig:
   bootstrap = bootstrap_config_path()
   config = AppConfig()
