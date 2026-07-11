@@ -84,8 +84,8 @@ class FlowDialog(ctk.CTkToplevel):
     self._excel_name = self._labeled_entry(body, 'Nome do arquivo Excel', 'Ex.: consolidado.xlsx')
     self._excel_password = self._labeled_entry(
       body,
-      'Senha para edição (opcional)',
-      'Abre em leitura sem senha; exige senha para alterar no Excel',
+      'Senha para modificar (opcional)',
+      'Como no Excel: Salvar como → Opções gerais → Senha para modificar',
     )
     self._excel_password.configure(show='*')
     self._header_source = self._excel_file_row(body, 'Excel de referência (cabeçalho)', pick='file')
