@@ -93,16 +93,14 @@ Cada fluxo define:
 |-------|-----------|
 | Nome | Identificação do fluxo |
 | Arquivo esperado | Nome exato ou com wildcards (`*`, `?`) na pasta monitorada |
-| Pasta do Excel | Onde criar/atualizar a planilha |
+| Pasta do Excel | Onde criar/atualizar a planilha (o app cria subpasta do ano, ex.: `2026/`) |
 | Nome do Excel | Nome do arquivo `.xlsx` |
-| Excel de referência | Caminho opcional de um `.xlsx` existente para carregar o cabeçalho |
-| Aba de referência | Qual aba ler no Excel de referência (vazio = mês atual) |
 | Senha para modificar | Opcional — igual ao Excel: *Salvar como → Opções gerais → Senha para modificar* |
-| Colunas | Cabeçalho gravado quando a aba do mês é nova ou vazia |
+| Colunas | Cabeçalho gravado quando a aba do mês é nova ou vazia — cole a linha copiada do Excel |
 
 **Senha para modificar:** o arquivo **abre sem senha de abertura**. No Excel o usuário pode escolher **Somente leitura**; para salvar no original precisa da senha. Sem a senha, só **Salvar uma cópia**. O aplicativo grava no arquivo original usando a senha configurada no fluxo.
 
-**Colunas:** informe o *Excel de referência* e clique em *Carregar do arquivo de referência*, cole a linha de cabeçalho, ou use *Importar outro Excel*.
+**Colunas:** copie a linha de cabeçalho no Excel e clique em *Colar da área de transferência* no cadastro do fluxo (ou cole direto no campo de texto).
 
 > A senha fica salva em texto no `config.json` local (uso em máquina/desktop).
 
