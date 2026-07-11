@@ -110,6 +110,16 @@ Cada fluxo define:
 
 A aba usada segue o padrão `Julho 2026` (mês em português + ano). Se a aba não existir ou estiver vazia, o cabeçalho configurado no fluxo é criado antes de colar os dados.
 
+### Cores alternadas por dia
+
+As linhas coladas pelo aplicativo recebem cor de fundo que alterna a cada **dia do calendário**:
+
+- No primeiro dia processado na aba, as linhas ficam **brancas**
+- No dia seguinte, **roxo claro**
+- No próximo dia, branco de novo — e assim por diante
+
+Vários arquivos no **mesmo dia** mantêm a mesma cor. O controle fica em uma aba oculta `__AEF__` dentro do Excel (não altere essa aba manualmente).
+
 ### Wildcards no arquivo esperado
 
 O campo **Arquivo esperado** aceita padrões com curingas:

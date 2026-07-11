@@ -8,7 +8,14 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from app.models.schema import Flow
-from app.services.excel_service import append_csv_to_excel, current_month_sheet_name, read_tab_csv
+from app.services.excel_service import (
+  META_SHEET_NAME,
+  ROW_FILL_PURPLE,
+  ROW_FILL_WHITE,
+  append_csv_to_excel,
+  current_month_sheet_name,
+  read_tab_csv,
+)
 
 
 class ExcelServiceTests(unittest.TestCase):
@@ -43,6 +50,57 @@ class ExcelServiceTests(unittest.TestCase):
       sheet = workbook['Julho 2026']
       self.assertEqual(sheet.max_row, 3)
       self.assertEqual(sheet.cell(row=3, column=1).value, 'N')
+
+  def test_row_fill_same_day_stays_white(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Col1', 'Col2']
+      day = datetime(2026, 7, 12, 10, 0, 0)
+
+      csv_path.write_text('A\tB\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name='Julho 2026', processed_on=day,
+      )
+      csv_path.write_text('C\tD\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name='Julho 2026', processed_on=day.replace(hour=15),
+      )
+
+      workbook = load_workbook(excel_path)
+      sheet = workbook['Julho 2026']
+      self.assertEqual(sheet.cell(row=2, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
+      self.assertEqual(sheet.cell(row=3, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
+
+  def test_row_fill_alternates_on_new_day(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Col1', 'Col2']
+
+      csv_path.write_text('A\tB\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name='Julho 2026',
+        processed_on=datetime(2026, 7, 12, 9, 0, 0),
+      )
+      csv_path.write_text('C\tD\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name='Julho 2026',
+        processed_on=datetime(2026, 7, 13, 9, 0, 0),
+      )
+      csv_path.write_text('E\tF\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name='Julho 2026',
+        processed_on=datetime(2026, 7, 14, 9, 0, 0),
+      )
+
+      workbook = load_workbook(excel_path)
+      sheet = workbook['Julho 2026']
+      self.assertEqual(sheet.cell(row=2, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
+      self.assertEqual(sheet.cell(row=3, column=1).fill.fgColor.rgb, ROW_FILL_PURPLE.fgColor.rgb)
+      self.assertEqual(sheet.cell(row=4, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
+      self.assertIn(META_SHEET_NAME, workbook.sheetnames)
+      self.assertEqual(workbook[META_SHEET_NAME].sheet_state, 'hidden')
 
 
 class FlowTests(unittest.TestCase):
