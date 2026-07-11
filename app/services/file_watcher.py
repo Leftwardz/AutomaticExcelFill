@@ -18,8 +18,8 @@ from app.services.coordination import (
   EXCEL_STALE_SECONDS,
   LockNotAcquired,
   exclusive_lock,
-  locks_root,
 )
+from app.utils.app_data_paths import locks_root, migrate_legacy_app_data
 from app.services.excel_service import DuplicateRowError, append_csv_to_excel, excel_full_path
 from app.services.file_stability import wait_for_file_stable
 from app.services.job_log import append_job_log, resolve_shared_log_path
@@ -87,6 +87,8 @@ class _CsvHandler(FileSystemEventHandler):
     if not watch_folder:
       self._on_log('error', f'[{flow.name}] Pasta de monitoramento não configurada.')
       return
+
+    migrate_legacy_app_data(watch_folder)
 
     if not skip_stability_wait and not wait_for_file_stable(path):
       self._on_log('info', f'[{flow.name}] {path.name} ainda sendo copiado — será tentado novamente.')

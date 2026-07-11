@@ -18,14 +18,9 @@ class LockNotAcquired(Exception):
     super().__init__(message)
 
 
-LOCK_DIR_NAME = '.automatic_fill_locks'
 DEFAULT_STALE_SECONDS = 600
 CSV_STALE_SECONDS = 300
 EXCEL_STALE_SECONDS = 600
-
-
-def locks_root(watch_folder: str | Path) -> Path:
-  return Path(watch_folder) / LOCK_DIR_NAME
 
 
 def _safe_lock_name(name: str) -> str:

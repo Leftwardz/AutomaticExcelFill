@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Optional
 
 from app.models.schema import AppConfig, Flow
+from app.utils.app_data_paths import CONFIG_FILENAME, migrate_legacy_app_data, shared_config_path
 from app.utils.filename_matching import filename_matches_pattern, has_wildcards
 
-CONFIG_FILENAME = 'config.json'
 CONFIG_ENV_VAR = 'AUTOMATIC_EXCEL_FILL_CONFIG'
 
 
@@ -22,10 +22,6 @@ def app_dir() -> Path:
 
 def bootstrap_config_path() -> Path:
   return app_dir() / CONFIG_FILENAME
-
-
-def shared_config_path(watch_folder: str) -> Path:
-  return Path(watch_folder) / CONFIG_FILENAME
 
 
 def resolve_config_path(watch_folder: str = '') -> Path:
@@ -53,6 +49,7 @@ def read_shared_config(watch_folder: str) -> AppConfig | None:
   folder = (watch_folder or '').strip()
   if not folder:
     return None
+  migrate_legacy_app_data(folder)
   shared = shared_config_path(folder)
   if not shared.is_file():
     return None
@@ -74,6 +71,7 @@ def load_config() -> AppConfig:
 
   watch_folder = (config.watch_folder or '').strip()
   if watch_folder:
+    migrate_legacy_app_data(watch_folder)
     shared = shared_config_path(watch_folder)
     if shared.is_file() and shared.resolve() != bootstrap.resolve():
       with open(shared, encoding='utf-8') as handle:

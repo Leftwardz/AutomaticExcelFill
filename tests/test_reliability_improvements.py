@@ -15,6 +15,12 @@ from app.services.excel_service import read_tab_csv
 from app.services.file_stability import wait_for_file_stable
 from app.services.job_log import append_job_log, read_job_log_tail
 from app.models.storage import load_config, read_shared_config, save_config
+from app.utils.app_data_paths import (
+  APP_DATA_DIR_NAME,
+  app_data_dir,
+  locks_root,
+  shared_config_path,
+)
 from app.utils.network_paths import is_likely_network_path
 
 
@@ -75,7 +81,8 @@ class StorageTests(unittest.TestCase):
     with tempfile.TemporaryDirectory() as tmp:
       watch = Path(tmp) / 'monitor'
       watch.mkdir()
-      shared = watch / 'config.json'
+      shared = app_data_dir(watch) / 'config.json'
+      shared.parent.mkdir(parents=True, exist_ok=True)
       shared.write_text(json.dumps({
         'watch_folder': str(watch),
         'flows': [{'name': 'A', 'source_filename': 'x.csv', 'excel_directory': '/a', 'excel_filename': 'b.xlsx'}],
@@ -91,11 +98,10 @@ class StorageTests(unittest.TestCase):
       watch.mkdir()
       bootstrap = tmp_path / 'local' / 'config.json'
 
-      with mock.patch('app.models.storage.bootstrap_config_path', return_value=bootstrap), \
-           mock.patch('app.models.storage.shared_config_path', side_effect=lambda wf: Path(wf) / 'config.json'):
+      with mock.patch('app.models.storage.bootstrap_config_path', return_value=bootstrap):
         config = AppConfig(watch_folder=str(watch))
         save_config(config)
-        self.assertTrue((watch / 'config.json').is_file())
+        self.assertTrue(shared_config_path(watch).is_file())
         self.assertTrue(bootstrap.is_file())
         bootstrap_data = json.loads(bootstrap.read_text(encoding='utf-8'))
         self.assertEqual(bootstrap_data['watch_folder'], str(watch))
@@ -107,7 +113,8 @@ class StorageTests(unittest.TestCase):
       watch.mkdir()
       bootstrap = tmp_path / 'bootstrap.json'
       bootstrap.write_text(json.dumps({'watch_folder': str(watch), 'flows': []}), encoding='utf-8')
-      shared = watch / 'config.json'
+      shared = app_data_dir(watch) / 'config.json'
+      shared.parent.mkdir(parents=True, exist_ok=True)
       shared.write_text(json.dumps({
         'watch_folder': str(watch),
         'flows': [{
@@ -118,8 +125,7 @@ class StorageTests(unittest.TestCase):
         }],
       }), encoding='utf-8')
 
-      with mock.patch('app.models.storage.bootstrap_config_path', return_value=bootstrap), \
-           mock.patch('app.models.storage.shared_config_path', side_effect=lambda wf: Path(wf) / 'config.json'):
+      with mock.patch('app.models.storage.bootstrap_config_path', return_value=bootstrap):
         config = load_config()
         self.assertEqual(config.flows[0].name, 'Remoto')
 

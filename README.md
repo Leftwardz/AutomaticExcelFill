@@ -102,7 +102,7 @@ Cada fluxo define:
 
 **Colunas:** copie a linha de cabeçalho no Excel e clique em *Colar da área de transferência* no cadastro do fluxo (ou cole direto no campo de texto).
 
-> A senha fica salva em texto no `config.json` compartilhado na pasta monitorada (uso em máquina/desktop).
+> A senha fica salva em texto no `config.json` dentro de `_AutomaticExcelFill` na pasta monitorada.
 
 ### Aba do mês
 
@@ -152,25 +152,23 @@ A comparação ignora maiúsculas/minúsculas. Se dois fluxos casarem com o mesm
 O arquivo compartilhado fica em:
 
 ```
-\\servidor\AutomaticExcelFill\config.json
+\\servidor\AutomaticExcelFill\_AutomaticExcelFill\config.json
 ```
 
-Esse arquivo contém **tudo**: pasta monitorada, fluxos, colunas, senhas e opções. Cadastrou um fluxo em um PC → aparece no outro após recarregar.
-
-Ao lado do `.exe` em cada PC fica só um `config.json` mínimo com o caminho da pasta (bootstrap), apontando para o arquivo da rede.
+Na raiz da pasta monitorada ficam **somente os arquivos para processamento** (e subpastas `processados/` e `falhas/`). Config, log e locks ficam em `_AutomaticExcelFill/`.
 
 > **Importante:** use o **mesmo texto de caminho** nos dois PCs (`\\servidor\...` ou `Z:\...` se for a mesma unidade mapeada). Caminhos diferentes para a mesma pasta podem parecer pastas distintas para o Windows.
 
 #### Sincronização dos fluxos
 
-- Ao salvar fluxo, configuração ou opções, grava em `{pasta monitorada}/config.json`
+- Ao salvar fluxo, configuração ou opções, grava em `{pasta monitorada}/_AutomaticExcelFill/config.json`
 - Ao abrir a aba *Fluxos*, o app **recarrega da rede** automaticamente
 - Botões **Recarregar da rede** (em *Fluxos* e *Configurações*) forçam atualização manual
 - Antes de salvar, o app lê a versão mais recente da rede para não apagar fluxos do outro PC
 
 #### Locks e processamento
 
-- O app cria locks em `{pasta monitorada}/.automatic_fill_locks/`
+- O app cria locks em `{pasta monitorada}/_AutomaticExcelFill/.automatic_fill_locks/`
 - Quem conseguir o lock do **arquivo CSV** primeiro processa; o outro ignora com mensagem no monitor
 - O lock do **Excel** garante gravação sequencial na mesma planilha
 

@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.models.schema import AppConfig
+from app.utils.app_data_paths import default_shared_log_path, migrate_legacy_app_data
 
 
 def resolve_shared_log_path(config: AppConfig) -> Path:
@@ -16,7 +17,8 @@ def resolve_shared_log_path(config: AppConfig) -> Path:
     return path
   watch_folder = (config.watch_folder or '').strip()
   if watch_folder:
-    return Path(watch_folder) / 'automatic_fill.log'
+    migrate_legacy_app_data(watch_folder)
+    return default_shared_log_path(watch_folder)
   return Path('automatic_fill.log')
 
 

@@ -6,7 +6,8 @@ from datetime import datetime
 from pathlib import Path
 
 from app.models.schema import AppConfig
-from app.services.coordination import LockNotAcquired, exclusive_lock, locks_root
+from app.services.coordination import LockNotAcquired, exclusive_lock
+from app.utils.app_data_paths import locks_root
 from app.services.job_log import append_job_log, resolve_shared_log_path
 
 
@@ -31,7 +32,10 @@ class CoordinationTests(unittest.TestCase):
 class JobLogTests(unittest.TestCase):
   def test_resolve_shared_log_path_defaults_to_watch_folder(self):
     config = AppConfig(watch_folder='/rede/pasta')
-    self.assertEqual(resolve_shared_log_path(config), Path('/rede/pasta/automatic_fill.log'))
+    self.assertEqual(
+      resolve_shared_log_path(config),
+      Path('/rede/pasta/_AutomaticExcelFill/automatic_fill.log'),
+    )
 
   def test_resolve_shared_log_path_custom_file(self):
     config = AppConfig(shared_log_path='/rede/logs/jobs.log')

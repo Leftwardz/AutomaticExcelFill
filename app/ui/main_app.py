@@ -357,7 +357,7 @@ class App(ctk.CTk):
 
     ctk.CTkLabel(
       body,
-      text='Use o mesmo caminho de rede nos dois PCs. Fluxos e configurações ficam em config.json dentro dessa pasta.',
+      text='Use o mesmo caminho de rede nos dois PCs. Fluxos e configurações ficam em _AutomaticExcelFill\\config.json dentro dessa pasta.',
       font=(FONT, 10),
       text_color=THEME_TEXT_SECONDARY,
       wraplength=700,
@@ -419,7 +419,7 @@ class App(ctk.CTk):
     ctk.CTkLabel(log_row, text='Log compartilhado:', text_color=THEME_TEXT_SECONDARY).pack(side='left')
     self.entry_shared_log_path = ctk.CTkEntry(log_row, **_entry_kwargs())
     self.entry_shared_log_path.pack(side='left', fill='x', expand=True, padx=(8, 0))
-    placeholder = 'Padrão: pasta monitorada / automatic_fill.log'
+    placeholder = 'Padrão: _AutomaticExcelFill/automatic_fill.log'
     if self.config_data.shared_log_path:
       self.entry_shared_log_path.insert(0, self.config_data.shared_log_path)
     else:
@@ -475,7 +475,7 @@ class App(ctk.CTk):
 
   def _restore_shared_log_placeholder(self, _event=None):
     if not self.entry_shared_log_path.get().strip():
-      self.entry_shared_log_path.insert(0, 'Padrão: pasta monitorada / automatic_fill.log')
+      self.entry_shared_log_path.insert(0, 'Padrão: _AutomaticExcelFill/automatic_fill.log')
       self.entry_shared_log_path.configure(text_color=THEME_TEXT_SECONDARY)
 
   def _reload_shared_config(self, *, quiet: bool = False) -> bool:
@@ -529,7 +529,7 @@ class App(ctk.CTk):
       self.entry_shared_log_path.insert(0, self.config_data.shared_log_path)
       self.entry_shared_log_path.configure(text_color='white')
     else:
-      self.entry_shared_log_path.insert(0, 'Padrão: pasta monitorada / automatic_fill.log')
+      self.entry_shared_log_path.insert(0, 'Padrão: _AutomaticExcelFill/automatic_fill.log')
       self.entry_shared_log_path.configure(text_color=THEME_TEXT_SECONDARY)
 
   def _refresh_config_path_label(self) -> None:
