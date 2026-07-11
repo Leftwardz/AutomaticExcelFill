@@ -108,7 +108,9 @@ Cada fluxo define:
 
 ### Aba do mês
 
-A aba usada segue o padrão `Julho 2026` (mês em português + ano). Se a aba não existir ou estiver vazia, o cabeçalho configurado no fluxo é criado antes de colar os dados.
+O Excel de cada fluxo é criado em uma subpasta do **ano atual** dentro da pasta configurada. Exemplo: pasta `D:\Planilhas` → arquivo em `D:\Planilhas\2026\relatorio.xlsx`.
+
+A aba usada segue só o **nome do mês em português** (minúsculas): `julho`, `junho`, etc. Se a aba não existir ou estiver vazia, o cabeçalho configurado no fluxo é criado antes de colar os dados.
 
 ### Cores alternadas por dia
 

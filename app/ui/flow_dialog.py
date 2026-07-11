@@ -89,7 +89,7 @@ class FlowDialog(ctk.CTkToplevel):
     )
     self._excel_password.configure(show='*')
     self._header_source = self._excel_file_row(body, 'Excel de referência (cabeçalho)', pick='file')
-    self._header_sheet = self._labeled_entry(body, 'Aba do Excel de referência (opcional)', 'Ex.: Julho 2026 — vazio = mês atual')
+    self._header_sheet = self._labeled_entry(body, 'Aba do Excel de referência (opcional)', 'Ex.: julho — vazio = mês atual')
     self._headers = self._headers_block(body)
 
     footer = ctk.CTkFrame(self, fg_color='transparent')

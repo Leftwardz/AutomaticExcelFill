@@ -44,19 +44,24 @@ class DuplicateRowError(ValueError):
     )
 
 MONTHS_PT = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ]
 
 
 def current_month_sheet_name(when: datetime | None = None) -> str:
   when = when or datetime.now()
-  return f'{MONTHS_PT[when.month - 1]} {when.year}'
+  return MONTHS_PT[when.month - 1]
 
 
-def excel_full_path(directory: str, filename: str) -> Path:
+def excel_year_directory(directory: str, when: datetime | None = None) -> Path:
+  when = when or datetime.now()
+  return Path(directory) / str(when.year)
+
+
+def excel_full_path(directory: str, filename: str, when: datetime | None = None) -> Path:
   name = filename if filename.lower().endswith('.xlsx') else f'{filename}.xlsx'
-  return Path(directory) / name
+  return excel_year_directory(directory, when) / name
 
 
 def read_tab_csv(path: Path) -> List[List[str]]:

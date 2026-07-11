@@ -17,14 +17,21 @@ from app.services.excel_service import (
   TEXT_NUMBER_FORMAT,
   append_csv_to_excel,
   current_month_sheet_name,
+  excel_full_path,
   read_tab_csv,
 )
 
 
 class ExcelServiceTests(unittest.TestCase):
+  JULY_2026 = datetime(2026, 7, 10)
+  SHEET_JULY = 'julho'
+
   def test_current_month_sheet_name(self):
-    when = datetime(2026, 7, 10)
-    self.assertEqual(current_month_sheet_name(when), 'Julho 2026')
+    self.assertEqual(current_month_sheet_name(self.JULY_2026), 'julho')
+
+  def test_excel_full_path_uses_year_subfolder(self):
+    path = excel_full_path('/dados/excel', 'relatorio', when=self.JULY_2026)
+    self.assertEqual(path, Path('/dados/excel/2026/relatorio.xlsx'))
 
   def test_append_creates_sheet_and_headers(self):
     with tempfile.TemporaryDirectory() as tmp:
@@ -32,11 +39,13 @@ class ExcelServiceTests(unittest.TestCase):
       csv_path.write_text('A\tB\tC\n1\t2\t3\n4\t5\t6\n', encoding='utf-8')
       excel_path = Path(tmp) / 'saida.xlsx'
       headers = ['Col1', 'Col2', 'Col3']
-      sheet_name, count = append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
-      self.assertEqual(sheet_name, 'Julho 2026')
+      sheet_name, count = append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+      )
+      self.assertEqual(sheet_name, self.SHEET_JULY)
       self.assertEqual(count, 3)
       workbook = load_workbook(excel_path)
-      sheet = workbook['Julho 2026']
+      sheet = workbook[self.SHEET_JULY]
       self.assertEqual(sheet.cell(row=1, column=1).value, 'Col1')
       self.assertEqual(sheet.cell(row=2, column=1).value, 'A')
       self.assertEqual(sheet.cell(row=4, column=3).value, '6')
@@ -46,11 +55,15 @@ class ExcelServiceTests(unittest.TestCase):
       csv_path = Path(tmp) / 'dados.csv'
       csv_path.write_text('X\tY\n', encoding='utf-8')
       excel_path = Path(tmp) / 'saida.xlsx'
-      append_csv_to_excel(csv_path, excel_path, ['Col1', 'Col2'], sheet_name='Julho 2026')
+      append_csv_to_excel(
+        csv_path, excel_path, ['Col1', 'Col2'], sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+      )
       csv_path.write_text('N\tM\n', encoding='utf-8')
-      append_csv_to_excel(csv_path, excel_path, ['Col1', 'Col2'], sheet_name='Julho 2026')
+      append_csv_to_excel(
+        csv_path, excel_path, ['Col1', 'Col2'], sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+      )
       workbook = load_workbook(excel_path)
-      sheet = workbook['Julho 2026']
+      sheet = workbook[self.SHEET_JULY]
       self.assertEqual(sheet.max_row, 3)
       self.assertEqual(sheet.cell(row=3, column=1).value, 'N')
 
@@ -63,15 +76,15 @@ class ExcelServiceTests(unittest.TestCase):
 
       csv_path.write_text('A\tB\n', encoding='utf-8')
       append_csv_to_excel(
-        csv_path, excel_path, headers, sheet_name='Julho 2026', processed_on=day,
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=day,
       )
       csv_path.write_text('C\tD\n', encoding='utf-8')
       append_csv_to_excel(
-        csv_path, excel_path, headers, sheet_name='Julho 2026', processed_on=day.replace(hour=15),
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=day.replace(hour=15),
       )
 
       workbook = load_workbook(excel_path)
-      sheet = workbook['Julho 2026']
+      sheet = workbook[self.SHEET_JULY]
       self.assertEqual(sheet.cell(row=2, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
       self.assertEqual(sheet.cell(row=3, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
 
@@ -83,22 +96,22 @@ class ExcelServiceTests(unittest.TestCase):
 
       csv_path.write_text('A\tB\n', encoding='utf-8')
       append_csv_to_excel(
-        csv_path, excel_path, headers, sheet_name='Julho 2026',
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY,
         processed_on=datetime(2026, 7, 12, 9, 0, 0),
       )
       csv_path.write_text('C\tD\n', encoding='utf-8')
       append_csv_to_excel(
-        csv_path, excel_path, headers, sheet_name='Julho 2026',
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY,
         processed_on=datetime(2026, 7, 13, 9, 0, 0),
       )
       csv_path.write_text('E\tF\n', encoding='utf-8')
       append_csv_to_excel(
-        csv_path, excel_path, headers, sheet_name='Julho 2026',
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY,
         processed_on=datetime(2026, 7, 14, 9, 0, 0),
       )
 
       workbook = load_workbook(excel_path)
-      sheet = workbook['Julho 2026']
+      sheet = workbook[self.SHEET_JULY]
       self.assertEqual(sheet.cell(row=2, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
       self.assertEqual(sheet.cell(row=3, column=1).fill.fgColor.rgb, ROW_FILL_PURPLE.fgColor.rgb)
       self.assertEqual(sheet.cell(row=4, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
@@ -112,10 +125,12 @@ class ExcelServiceTests(unittest.TestCase):
       csv_path.write_text(f'ID\t{long_value}\n', encoding='utf-8')
       excel_path = Path(tmp) / 'saida.xlsx'
       headers = ['Código', 'Descrição detalhada']
-      append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+      )
 
       workbook = load_workbook(excel_path)
-      sheet = workbook['Julho 2026']
+      sheet = workbook[self.SHEET_JULY]
       header = sheet.cell(row=1, column=2)
       data = sheet.cell(row=2, column=2)
 
@@ -133,11 +148,13 @@ class ExcelServiceTests(unittest.TestCase):
       headers = ['Col1', 'Col2']
 
       csv_path.write_text('A\tB\n', encoding='utf-8')
-      append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
+      append_csv_to_excel(csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026)
 
       csv_path.write_text('A\tB\n', encoding='utf-8')
       with self.assertRaises(Exception) as ctx:
-        append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
+        append_csv_to_excel(
+          csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+        )
       self.assertIn('duplicada', str(ctx.exception).lower())
 
   def test_duplicate_row_within_same_file_raises(self):
@@ -148,7 +165,9 @@ class ExcelServiceTests(unittest.TestCase):
       csv_path.write_text('A\tB\nA\tB\n', encoding='utf-8')
 
       with self.assertRaises(Exception) as ctx:
-        append_csv_to_excel(csv_path, excel_path, headers, sheet_name='Julho 2026')
+        append_csv_to_excel(
+          csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+        )
       self.assertIn('mesmo arquivo', str(ctx.exception).lower())
 
 
