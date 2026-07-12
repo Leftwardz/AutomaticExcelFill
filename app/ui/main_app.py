@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 from pathlib import Path
+from threading import Thread
 from tkinter import filedialog, ttk
 
 from app.models.schema import AppConfig, Flow
@@ -35,8 +36,10 @@ from app.ui.constants import (
   THEME_TEXT_SECONDARY,
 )
 from app.ui.flow_dialog import FlowDialog
+from app.ui.log_view import ColoredLogView
 from app.ui.theme_assets import gradient_ctk_image
 from app.ui.ttk_theme import ARTEMIS_SCROLLBAR_V_STYLE, ARTEMIS_TREEVIEW_STYLE, apply_artemis_ttk_theme
+from app.ui.window_utils import create_scrollable_frame, schedule_center_window
 
 
 def _entry_kwargs(**extra):
@@ -96,6 +99,7 @@ class App(ctk.CTk):
     self.watcher = FolderWatcher(self._add_log)
     self._active_view = 'monitor'
     self._nav_buttons: dict[str, ctk.CTkButton] = {}
+    self._manual_process_running = False
 
     self.grid_columnconfigure(1, weight=1)
     self.grid_rowconfigure(0, weight=1)
@@ -108,6 +112,7 @@ class App(ctk.CTk):
       self.after(500, self._start_watcher)
 
     self.protocol('WM_DELETE_WINDOW', self._on_close)
+    schedule_center_window(self)
 
   def _build_sidebar(self):
     sidebar = ctk.CTkFrame(self, width=SIDEBAR_WIDTH, corner_radius=0, fg_color=THEME_SIDEBAR)
@@ -210,12 +215,13 @@ class App(ctk.CTk):
       **_secondary_btn_kwargs(height=36),
     )
     self.btn_stop.pack(side='left', padx=(8, 0))
-    ctk.CTkButton(
+    self.btn_process_manual = ctk.CTkButton(
       controls,
       text='Processar arquivo...',
       command=self._process_file_manual,
       **_secondary_btn_kwargs(height=36),
-    ).pack(side='left', padx=(8, 0))
+    )
+    self.btn_process_manual.pack(side='left', padx=(8, 0))
     ctk.CTkButton(
       controls,
       text='Atualizar log compartilhado',
@@ -238,6 +244,7 @@ class App(ctk.CTk):
     )
     self.log_box.pack(fill='both', expand=True)
     self.log_box.configure(state='disabled')
+    self.session_log_view = ColoredLogView(self.log_box)
 
     shared_card, shared_body = _section_card(self.monitor_view, 'Log compartilhado (rede)')
     shared_card.grid(row=2, column=0, sticky='nsew', pady=(12, 0))
@@ -254,6 +261,7 @@ class App(ctk.CTk):
     )
     self.shared_log_box.pack(fill='both', expand=True)
     self.shared_log_box.configure(state='disabled')
+    self.shared_log_view = ColoredLogView(self.shared_log_box)
 
   def _build_flows_view(self):
     top = ctk.CTkFrame(self.flows_view, fg_color='transparent')
@@ -332,7 +340,7 @@ class App(ctk.CTk):
     self._reload_flows_table()
 
   def _build_settings_view(self):
-    scroll = ctk.CTkScrollableFrame(self.settings_view, fg_color='transparent')
+    scroll = create_scrollable_frame(self.settings_view, fg_color='transparent')
     scroll.grid(row=0, column=0, sticky='nsew')
 
     card, body = _section_card(scroll, 'Pasta principal')
@@ -679,6 +687,9 @@ class App(ctk.CTk):
     self._refresh_config_path_label()
 
   def _process_file_manual(self):
+    if self._manual_process_running:
+      self._add_log('info', 'Já existe um processamento manual em andamento.')
+      return
     path = filedialog.askopenfilename(
       parent=self,
       title='Selecionar arquivo para processar',
@@ -689,32 +700,44 @@ class App(ctk.CTk):
     )
     if not path:
       return
-    self._add_log('info', f'Processamento manual: {Path(path).name}')
-    self.watcher.process_file_now(Path(path))
+
+    selected_path = Path(path)
+    self._manual_process_running = True
+    self.btn_process_manual.configure(state='disabled')
+    self._add_log('info', f'Iniciando processamento manual: {selected_path.name}...')
+
+    def worker():
+      try:
+        self.watcher.process_file_now(selected_path)
+      finally:
+        self.after(0, self._finish_manual_process)
+
+    Thread(target=worker, daemon=True).start()
+
+  def _finish_manual_process(self):
+    self._manual_process_running = False
+    self.btn_process_manual.configure(state='normal')
     self._refresh_shared_log()
+
+  def _apply_shared_log(self, header: str, content: str) -> None:
+    if content.startswith('Nenhum registro') or content.startswith('Não foi possível'):
+      self.shared_log_view.render_plain(f'{header}\n\n{content}')
+      return
+    self.shared_log_view.render_shared_log(header, content.splitlines())
 
   def _refresh_shared_log(self):
     log_path = resolve_shared_log_path(self.config_data)
-    content = read_job_log_tail(log_path)
-    header = f'Arquivo: {log_path}\n{"—" * 48}\n'
+    header = f'Arquivo: {log_path}'
 
-    def apply():
-      self.shared_log_box.configure(state='normal')
-      self.shared_log_box.delete('1.0', 'end')
-      self.shared_log_box.insert('1.0', header + content)
-      self.shared_log_box.see('end')
-      self.shared_log_box.configure(state='disabled')
+    def worker():
+      content = read_job_log_tail(log_path)
+      self.after(0, lambda: self._apply_shared_log(header, content))
 
-    self.after(0, apply)
+    Thread(target=worker, daemon=True).start()
 
   def _add_log(self, level: str, message: str):
-    prefix = {'info': 'ℹ', 'success': '✓', 'error': '✗'}.get(level, '•')
-
     def append():
-      self.log_box.configure(state='normal')
-      self.log_box.insert('end', f'{prefix} {message}\n')
-      self.log_box.see('end')
-      self.log_box.configure(state='disabled')
+      self.session_log_view.append_session_entry(level, message)
 
     self.after(0, append)
     if level in ('success', 'error'):

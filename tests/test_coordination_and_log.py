@@ -8,7 +8,7 @@ from pathlib import Path
 from app.models.schema import AppConfig
 from app.services.coordination import LockNotAcquired, exclusive_lock
 from app.utils.app_data_paths import locks_root
-from app.services.job_log import append_job_log, resolve_shared_log_path
+from app.services.job_log import append_job_log, format_processing_duration, resolve_shared_log_path
 
 
 class CoordinationTests(unittest.TestCase):
@@ -50,6 +50,11 @@ class JobLogTests(unittest.TestCase):
       self.assertIn('Fluxo A', content)
       self.assertIn('a.csv', content)
       self.assertIn('Linha duplicada', content)
+
+  def test_format_processing_duration(self):
+    self.assertEqual(format_processing_duration(0.42), '420 ms')
+    self.assertEqual(format_processing_duration(4.2), '4,2 s')
+    self.assertEqual(format_processing_duration(125), '2 min 5 s')
 
 
 if __name__ == '__main__':

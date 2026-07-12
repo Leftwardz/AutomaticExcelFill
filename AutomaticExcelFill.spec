@@ -6,13 +6,17 @@ from pathlib import Path
 block_cipher = None
 root = Path(SPECPATH)
 
+resource_dirs: list[tuple[str, str]] = []
+for folder_name in ('theme', 'img'):
+    folder_path = root / folder_name
+    if folder_path.is_dir():
+        resource_dirs.append((str(folder_path), folder_name))
+
 a = Analysis(
     ['main.py'],
     pathex=[str(root)],
     binaries=[],
-    datas=[
-        (str(root / 'theme' / 'presets.json'), 'theme'),
-    ],
+    datas=resource_dirs,
     hiddenimports=[
         'openpyxl',
         'msoffcrypto',
@@ -35,10 +39,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='AutomaticExcelFill',
     debug=False,
     bootloader_ignore_signals=False,
@@ -52,4 +54,15 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='AutomaticExcelFill',
 )

@@ -22,6 +22,23 @@ def resolve_shared_log_path(config: AppConfig) -> Path:
   return Path('automatic_fill.log')
 
 
+def format_processing_duration(seconds: float) -> str:
+  if seconds < 1:
+    return f'{seconds * 1000:.0f} ms'
+  if seconds < 60:
+    text = f'{seconds:.1f} s'
+    return text.replace('.', ',')
+  minutes = int(seconds // 60)
+  rest = seconds % 60
+  if abs(rest - round(rest)) < 0.05:
+    rest_text = f'{int(round(rest))} s'
+  elif rest >= 10:
+    rest_text = f'{int(rest)} s'
+  else:
+    rest_text = f'{rest:.1f} s'.replace('.', ',')
+  return f'{minutes} min {rest_text}'
+
+
 def append_job_log(
   log_path: Path,
   level: str,

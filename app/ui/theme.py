@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from app.ui import constants
+from app.utils.bundle_paths import resource_path
 
 
 @dataclass(frozen=True)
@@ -39,14 +40,8 @@ class ThemePreset:
 _current_theme_id: str = 'slate'
 
 
-def app_dir() -> Path:
-    if getattr(sys, 'frozen', False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parents[2]
-
-
 def presets_path() -> Path:
-    return app_dir() / 'theme' / 'presets.json'
+  return resource_path('theme', 'presets.json')
 
 
 @lru_cache(maxsize=1)

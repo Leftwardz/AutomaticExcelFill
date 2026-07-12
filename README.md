@@ -75,11 +75,17 @@ PYTHONPATH=. xvfb-run -a python3 scripts/smoke_test_gui.py
 
 ## Gerar executável (PyInstaller)
 
-```bash
-pyinstaller AutomaticExcelFill.spec
+```powershell
+.\scripts\build.ps1
 ```
 
-O executável será gerado em `dist/AutomaticExcelFill`.
+A distribuição fica em **`dist\AutomaticExcelFill\`** (pasta completa, não só o `.exe`):
+
+- `AutomaticExcelFill.exe`
+- `_internal\` (bibliotecas do PyInstaller)
+- `theme\presets.json` (temas da interface)
+
+Feche o programa antes de rodar `.\scripts\build.ps1 -Clean`.
 
 ## Configuração
 

@@ -43,16 +43,16 @@ class ExcelPasswordTests(unittest.TestCase):
         csv_path,
         excel_path,
         ['Nome', 'Qtd'],
-        sheet_name='julho',
+        sheet_name='Julho',
         processed_on=datetime(2026, 7, 10),
         excel_password='gravar123',
       )
       self.assertEqual(count, 1)
-      self.assertEqual(sheet_name, 'julho')
+      self.assertEqual(sheet_name, 'Julho')
       self.assertEqual(read_file_sharing_password_hash(excel_path), hash_password('gravar123'))
 
       loaded = load_workbook(excel_path)
-      self.assertEqual(loaded['julho'].cell(row=2, column=1).value, 'Item')
+      self.assertEqual(loaded['Julho'].cell(row=2, column=1).value, 'Item')
 
   def test_append_again_with_modify_password(self):
     with tempfile.TemporaryDirectory() as tmp:
@@ -62,17 +62,17 @@ class ExcelPasswordTests(unittest.TestCase):
       csv_path.write_text('A\t1\n', encoding='utf-8')
       append_csv_to_excel(
         csv_path, excel_path, ['Nome', 'Qtd'],
-        sheet_name='julho', processed_on=datetime(2026, 7, 10), excel_password='gravar123',
+        sheet_name='Julho', processed_on=datetime(2026, 7, 10), excel_password='gravar123',
       )
 
       csv_path.write_text('B\t2\n', encoding='utf-8')
       append_csv_to_excel(
         csv_path, excel_path, ['Nome', 'Qtd'],
-        sheet_name='julho', processed_on=datetime(2026, 7, 10), excel_password='gravar123',
+        sheet_name='Julho', processed_on=datetime(2026, 7, 10), excel_password='gravar123',
       )
 
       loaded = load_workbook(excel_path)
-      self.assertEqual(loaded['julho'].cell(row=3, column=1).value, 'B')
+      self.assertEqual(loaded['Julho'].cell(row=3, column=1).value, 'B')
       self.assertEqual(read_file_sharing_password_hash(excel_path), hash_password('gravar123'))
 
   def test_legacy_encrypted_file_still_needs_open_password(self):

@@ -1,8 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import List
+from typing import List, Literal
 from uuid import uuid4
+
+ColumnType = Literal['text', 'number', 'date']
+
+COLUMN_TYPE_LABELS = {
+  'text': 'Texto',
+  'number': 'Número',
+  'date': 'Data',
+}
+COLUMN_TYPE_BY_LABEL = {label: key for key, label in COLUMN_TYPE_LABELS.items()}
+
+
+def normalize_column_type(value: str) -> ColumnType:
+  item = str(value).strip().lower()
+  if item == 'number':
+    return 'number'
+  if item == 'date':
+    return 'date'
+  return 'text'
 
 
 @dataclass
@@ -12,11 +30,31 @@ class Flow:
   excel_directory: str
   excel_filename: str
   headers: List[str] = field(default_factory=list)
+  column_types: List[str] = field(default_factory=list)
+  column_duplicate_checks: List[bool] = field(default_factory=list)
+  skip_duplicate_row_check: bool = False
   excel_password: str = ''
   header_source_path: str = ''
   header_source_sheet: str = ''
   enabled: bool = True
   id: str = field(default_factory=lambda: str(uuid4()))
+
+  def normalized_column_types(self) -> List[str]:
+    types = [normalize_column_type(item) for item in (self.column_types or [])]
+    while len(types) < len(self.headers):
+      types.append('text')
+    return types[:len(self.headers)]
+
+  def normalized_column_duplicate_checks(self) -> List[bool]:
+    checks: List[bool] = []
+    for item in (self.column_duplicate_checks or []):
+      if isinstance(item, bool):
+        checks.append(item)
+      else:
+        checks.append(str(item).strip().lower() in {'1', 'true', 'sim', 'yes'})
+    while len(checks) < len(self.headers):
+      checks.append(False)
+    return checks[:len(self.headers)]
 
   def to_dict(self) -> dict:
     return asdict(self)
@@ -30,6 +68,9 @@ class Flow:
       excel_directory=data.get('excel_directory', ''),
       excel_filename=data.get('excel_filename', ''),
       headers=list(data.get('headers') or []),
+      column_types=list(data.get('column_types') or []),
+      column_duplicate_checks=list(data.get('column_duplicate_checks') or []),
+      skip_duplicate_row_check=bool(data.get('skip_duplicate_row_check', False)),
       excel_password=data.get('excel_password', ''),
       header_source_path=data.get('header_source_path', ''),
       header_source_sheet=data.get('header_source_sheet', ''),
