@@ -524,6 +524,84 @@ class ExcelServiceTests(unittest.TestCase):
         )
       self.assertIn('mesmo arquivo', str(ctx.exception).lower())
 
+  def test_duplicate_row_detected_when_meta_last_data_row_is_stale(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Col1', 'Col2']
+
+      csv_path.write_text('A\tB\n', encoding='utf-8')
+      append_csv_to_excel(csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026)
+      csv_path.write_text('C\tD\n', encoding='utf-8')
+      append_csv_to_excel(csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026)
+
+      workbook = load_workbook(excel_path)
+      meta = workbook[META_SHEET_NAME]
+      meta.cell(row=2, column=5, value=1)
+      meta.cell(row=2, column=4, value=1)
+      workbook.save(excel_path)
+
+      csv_path.write_text('C\tD\n', encoding='utf-8')
+      with self.assertRaises(Exception) as ctx:
+        append_csv_to_excel(
+          csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+        )
+      self.assertIn('duplicada', str(ctx.exception).lower())
+
+  def test_duplicate_row_detected_for_number_columns(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Valor']
+      csv_path.write_text('1234,56\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path,
+        excel_path,
+        headers,
+        column_types=['number'],
+        sheet_name=self.SHEET_JULY,
+        processed_on=self.JULY_2026,
+      )
+
+      csv_path.write_text('1234,56\n', encoding='utf-8')
+      with self.assertRaises(Exception) as ctx:
+        append_csv_to_excel(
+          csv_path,
+          excel_path,
+          headers,
+          column_types=['number'],
+          sheet_name=self.SHEET_JULY,
+          processed_on=self.JULY_2026,
+        )
+      self.assertIn('duplicada', str(ctx.exception).lower())
+
+  def test_duplicate_row_detected_for_date_columns(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Data']
+      csv_path.write_text('10/07/2026\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path,
+        excel_path,
+        headers,
+        column_types=['date'],
+        sheet_name=self.SHEET_JULY,
+        processed_on=self.JULY_2026,
+      )
+
+      csv_path.write_text('10/07/2026\n', encoding='utf-8')
+      with self.assertRaises(Exception) as ctx:
+        append_csv_to_excel(
+          csv_path,
+          excel_path,
+          headers,
+          column_types=['date'],
+          sheet_name=self.SHEET_JULY,
+          processed_on=self.JULY_2026,
+        )
+      self.assertIn('duplicada', str(ctx.exception).lower())
+
 
 class FlowTests(unittest.TestCase):
   def test_roundtrip(self):

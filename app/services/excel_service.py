@@ -674,13 +674,55 @@ def _apply_center_alignment(
       sheet.cell(row=row_index, column=col_index).alignment = CENTER_ALIGNMENT
 
 
-def _normalize_row_values(row: List[str], column_count: int) -> Tuple[str, ...]:
+def _normalize_value_for_comparison(value, column_type: str = 'text') -> str:
+  column_type = normalize_column_type(column_type)
+  if value is None:
+    return ''
+
+  if column_type == 'date':
+    if isinstance(value, datetime):
+      return value.date().strftime('%d/%m/%Y')
+    if isinstance(value, date):
+      return value.strftime('%d/%m/%Y')
+    text = str(value).strip()
+    parsed = _parse_date_value(text)
+    if parsed is not None:
+      return parsed.strftime('%d/%m/%Y')
+    return text
+
+  if column_type == 'number':
+    if isinstance(value, (int, float)):
+      number: int | float = int(value) if isinstance(value, float) and value.is_integer() else value
+    else:
+      parsed_number = _parse_numeric_value(str(value).strip())
+      if parsed_number is None:
+        return str(value).strip()
+      number = parsed_number
+    if isinstance(number, float) and number.is_integer():
+      return str(int(number))
+    return str(number)
+
+  return str(value).strip()
+
+
+def _column_type_at(column_types: List[str] | None, col_index: int) -> str:
+  if column_types and col_index < len(column_types):
+    return normalize_column_type(column_types[col_index])
+  return 'text'
+
+
+def _normalize_row_values(
+  row: List[str],
+  column_count: int,
+  column_types: List[str] | None = None,
+) -> Tuple[str, ...]:
   values: List[str] = []
   for col_index in range(column_count):
     if col_index < len(row):
-      values.append(str(row[col_index]).strip())
+      raw_value = row[col_index]
     else:
-      values.append('')
+      raw_value = ''
+    values.append(_normalize_value_for_comparison(raw_value, _column_type_at(column_types, col_index)))
   return tuple(values)
 
 
@@ -688,6 +730,24 @@ def _row_values_from_sheet(sheet: Worksheet, row_index: int, column_count: int) 
   values: List[str] = []
   for col_index in range(1, column_count + 1):
     values.append(str(sheet.cell(row=row_index, column=col_index).value or '').strip())
+  return tuple(values)
+
+
+def _comparison_row_values_from_sheet(
+  sheet: Worksheet,
+  row_index: int,
+  column_count: int,
+  column_types: List[str] | None = None,
+) -> Tuple[str, ...]:
+  values: List[str] = []
+  for col_index in range(1, column_count + 1):
+    cell_value = sheet.cell(row=row_index, column=col_index).value
+    values.append(
+      _normalize_value_for_comparison(
+        cell_value,
+        _column_type_at(column_types, col_index - 1),
+      )
+    )
   return tuple(values)
 
 
@@ -701,18 +761,15 @@ def _iter_sheet_row_tuples(
   *,
   start_row: int,
   end_row: int,
+  column_types: List[str] | None = None,
 ):
-  for row_index, row_values in enumerate(
-    sheet.iter_rows(
-      min_row=start_row,
-      max_row=end_row,
-      min_col=1,
-      max_col=column_count,
-      values_only=True,
-    ),
-    start=start_row,
-  ):
-    values = tuple(str(value or '').strip() for value in row_values)
+  for row_index in range(start_row, end_row + 1):
+    values = _comparison_row_values_from_sheet(
+      sheet,
+      row_index,
+      column_count,
+      column_types=column_types,
+    )
     if _row_is_blank(values):
       continue
     yield row_index, values
@@ -723,22 +780,22 @@ def _validate_no_duplicate_rows(
   new_rows: List[List[str]],
   column_count: int,
   *,
-  start_row: int,
-  existing_last_row: int | None = None,
+  column_types: List[str] | None = None,
 ) -> None:
   known_rows: dict[Tuple[str, ...], Tuple[int, str]] = {}
-  scan_end = existing_last_row if existing_last_row is not None else _last_data_row(sheet, column_count)
+  scan_end = _last_data_row(sheet, column_count)
   if scan_end >= DATA_START_ROW:
     for row_index, values in _iter_sheet_row_tuples(
       sheet,
       column_count,
       start_row=DATA_START_ROW,
       end_row=scan_end,
+      column_types=column_types,
     ):
       known_rows[values] = (row_index, 'planilha')
 
   for offset, row in enumerate(new_rows):
-    values = _normalize_row_values(row, column_count)
+    values = _normalize_row_values(row, column_count, column_types=column_types)
     if _row_is_blank(values):
       continue
     incoming_row_number = offset + 1
@@ -864,8 +921,7 @@ def append_csv_to_excel(
         sheet,
         rows,
         fill_column_count,
-        start_row=start_row,
-        existing_last_row=existing_last_data_row,
+        column_types=normalized_types,
       )
 
     for offset, row in enumerate(rows):
