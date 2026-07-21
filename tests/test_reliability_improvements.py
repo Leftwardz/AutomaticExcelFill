@@ -13,6 +13,7 @@ from app.services.coordination import LockNotAcquired, exclusive_lock
 from app.services.excel_crypto import save_workbook_to_path
 from app.services.excel_service import read_tab_csv
 from app.services.file_stability import wait_for_file_stable
+from app.services.file_watcher import _CsvHandler
 from app.services.job_log import append_job_log, read_job_log_tail
 from app.models.storage import load_config, read_shared_config, save_config
 from app.utils.app_data_paths import (
@@ -21,7 +22,7 @@ from app.utils.app_data_paths import (
   locks_root,
   shared_config_path,
 )
-from app.utils.network_paths import is_likely_network_path
+from app.utils.network_paths import is_likely_network_path, is_unc_path
 
 
 class FileStabilityTests(unittest.TestCase):
@@ -34,11 +35,38 @@ class FileStabilityTests(unittest.TestCase):
 
 class NetworkPathTests(unittest.TestCase):
   def test_unc_path_is_network(self):
+    self.assertTrue(is_unc_path('\\\\servidor\\pasta'))
     self.assertTrue(is_likely_network_path('\\\\servidor\\pasta'))
 
   def test_local_path_is_not_network(self):
     self.assertFalse(is_likely_network_path('/tmp/pasta'))
     self.assertFalse(is_likely_network_path('C:\\dados'))
+
+
+class RescanCandidateTests(unittest.TestCase):
+  def test_should_process_new_file(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      path = Path(tmp) / 'dados.csv'
+      path.write_text('a\tb\n', encoding='utf-8')
+      handler = _CsvHandler(lambda: AppConfig(), lambda *_: None)
+      self.assertTrue(handler.should_process_rescan_candidate(path))
+
+  def test_should_skip_after_marked_processed(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      path = Path(tmp) / 'dados.csv'
+      path.write_text('a\tb\n', encoding='utf-8')
+      handler = _CsvHandler(lambda: AppConfig(), lambda *_: None)
+      handler._mark_batch_processed([path])
+      self.assertFalse(handler.should_process_rescan_candidate(path))
+
+  def test_should_reprocess_when_file_changes(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      path = Path(tmp) / 'dados.csv'
+      path.write_text('a\tb\n', encoding='utf-8')
+      handler = _CsvHandler(lambda: AppConfig(), lambda *_: None)
+      handler._mark_batch_processed([path])
+      path.write_text('a\tb\nc\td\n', encoding='utf-8')
+      self.assertTrue(handler.should_process_rescan_candidate(path))
 
 
 class CoordinationTests(unittest.TestCase):

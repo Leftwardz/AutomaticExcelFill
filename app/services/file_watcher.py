@@ -62,8 +62,16 @@ from app.utils.network_paths import is_likely_network_path
 
 LogCallback = Callable[[str, str], None]
 
+NETWORK_RESCAN_INTERVAL_SECONDS = 30.0
+POLLING_OBSERVER_TIMEOUT_SECONDS = 2.0
 
 
+def _file_signature(path: Path) -> tuple[int, float] | None:
+  try:
+    stat = path.stat()
+    return stat.st_size, stat.st_mtime
+  except OSError:
+    return None
 
 
 class _CsvHandler(FileSystemEventHandler):
@@ -90,7 +98,16 @@ class _CsvHandler(FileSystemEventHandler):
 
     self._debounce_seconds = 1.0
 
+    self._processed_signatures: dict[str, tuple[int, float]] = {}
 
+    self._on_debug: LogCallback | None = None
+
+  def set_debug_logging(self, on_debug: LogCallback | None) -> None:
+    self._on_debug = on_debug
+
+  def _debug(self, message: str) -> None:
+    if self._on_debug is not None:
+      self._on_debug('info', message)
 
   def on_created(self, event):
 
@@ -98,7 +115,7 @@ class _CsvHandler(FileSystemEventHandler):
 
       return
 
-    self._handle_file(event.src_path)
+    self._handle_file(event.src_path, source='created')
 
 
 
@@ -108,21 +125,22 @@ class _CsvHandler(FileSystemEventHandler):
 
       return
 
-    self._handle_file(event.src_path)
+    self._handle_file(event.src_path, source='modified')
 
+  def on_moved(self, event):
+    if event.is_directory:
+      return
+    self._handle_file(event.dest_path, source='moved')
 
-
-  def _handle_file(self, src_path: str) -> None:
+  def _handle_file(self, src_path: str, *, source: str = 'event') -> None:
 
     path = Path(src_path)
 
     if path.suffix.lower() not in {'.csv', '.txt', '.tsv'}:
-
       return
 
-
-
     key = str(path.resolve())
+    self._debug(f'Evento {source}: {path.name}')
 
     now = time.time()
 
@@ -164,7 +182,18 @@ class _CsvHandler(FileSystemEventHandler):
 
       self._recent[str(item.resolve())] = now
 
+  def _mark_batch_processed(self, batch: list[Path]) -> None:
+    for item in batch:
+      signature = _file_signature(item)
+      if signature is not None:
+        self._processed_signatures[str(item.resolve())] = signature
 
+  def should_process_rescan_candidate(self, path: Path) -> bool:
+    key = str(path.resolve())
+    signature = _file_signature(path)
+    if signature is None:
+      return False
+    return self._processed_signatures.get(key) != signature
 
   def _process_file(self, path: Path, *, skip_stability_wait: bool = False) -> None:
 
@@ -179,7 +208,7 @@ class _CsvHandler(FileSystemEventHandler):
     flow = find_flow_by_filename(config, path.name)
 
     if flow is None:
-
+      self._debug(f'Ignorado (sem fluxo correspondente): {path.name}')
       return
 
 
@@ -205,9 +234,10 @@ class _CsvHandler(FileSystemEventHandler):
       self._on_log('info', f'[{flow.name}] Aguardando {path.name} finalizar a cópia...')
 
       if not wait_for_file_stable(path):
-
-        self._on_log('info', f'[{flow.name}] {path.name} ainda sendo copiado — será tentado novamente.')
-
+        self._on_log(
+          'info',
+          f'[{flow.name}] {path.name} ainda sendo copiado — nova tentativa no próximo ciclo.',
+        )
         return
 
 
@@ -395,6 +425,7 @@ class _CsvHandler(FileSystemEventHandler):
       self._archive_source(item, config)
 
     self._mark_batch_recent(batch)
+    self._mark_batch_processed(batch)
 
     if self._on_processed:
 
@@ -510,7 +541,11 @@ class FolderWatcher:
 
     self._scan_thread: Optional[Thread] = None
 
+    self._rescan_thread: Optional[Thread] = None
+
     self._watch_folder = ''
+
+    self._use_network_rescan = False
 
 
 
@@ -545,17 +580,16 @@ class FolderWatcher:
     self._watch_folder = str(folder)
 
     self._handler = _CsvHandler(load_config, self._on_log)
+    self._handler.set_debug_logging(self._on_log)
 
-    if is_likely_network_path(folder):
+    use_network_mode = is_likely_network_path(folder)
+    self._use_network_rescan = use_network_mode
 
-      self._observer = PollingObserver(timeout=2)
-
+    if use_network_mode:
+      self._observer = PollingObserver(timeout=POLLING_OBSERVER_TIMEOUT_SECONDS)
       observer_mode = 'polling (rede)'
-
     else:
-
       self._observer = Observer()
-
       observer_mode = 'eventos do sistema'
 
     self._observer.schedule(self._handler, str(folder), recursive=False)
@@ -568,7 +602,16 @@ class FolderWatcher:
 
     self._scan_thread.start()
 
-    self._on_log('info', f'Monitorando pasta: {folder} [{observer_mode}]')
+    if self._use_network_rescan:
+      self._rescan_thread = Thread(target=self._periodic_rescan, args=(folder,), daemon=True)
+      self._rescan_thread.start()
+      self._on_log(
+        'info',
+        f'Monitorando pasta: {folder} [{observer_mode}; varredura a cada '
+        f'{int(NETWORK_RESCAN_INTERVAL_SECONDS)}s]',
+      )
+    else:
+      self._on_log('info', f'Monitorando pasta: {folder} [{observer_mode}]')
 
 
 
@@ -593,6 +636,14 @@ class FolderWatcher:
       self._scan_thread.join(timeout=2)
 
     self._scan_thread = None
+
+    if self._rescan_thread and self._rescan_thread.is_alive():
+
+      self._rescan_thread.join(timeout=2)
+
+    self._rescan_thread = None
+
+    self._use_network_rescan = False
 
 
 
@@ -646,4 +697,36 @@ class FolderWatcher:
 
         return
 
+  def _periodic_rescan(self, folder: Path) -> None:
+    while not self._stop_event.wait(NETWORK_RESCAN_INTERVAL_SECONDS):
+      if self._handler is None:
+        continue
+
+      config = load_config()
+      started_flows: set[str] = set()
+
+      for flow in config.flows:
+        if not flow.enabled:
+          continue
+        if flow.id in started_flows:
+          continue
+
+        candidates = [
+          path
+          for path in iter_matching_files(folder, flow.source_filename)
+          if self._handler.should_process_rescan_candidate(path)
+        ]
+        if not candidates:
+          continue
+
+        self._on_log(
+          'info',
+          f'[rede] Varredura encontrou {len(candidates)} arquivo(s) pendente(s) para '
+          f'"{flow.name}": {", ".join(path.name for path in candidates)}',
+        )
+        self._handler._process_file(candidates[0])
+        started_flows.add(flow.id)
+
+        if self._stop_event.is_set():
+          return
 
