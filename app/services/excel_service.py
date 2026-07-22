@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from copy import copy
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -350,10 +350,26 @@ def _resolve_start_row(
   return max(resolved_last + 1, DATA_START_ROW), resolved_last
 
 
-def _resolve_row_color_index(last_date: date | None, current_date: date, current_index: int) -> int:
-  if last_date is None:
+def color_period_anchor(when: datetime, cutoff_hour: int = 19) -> date:
+  """Return the start date of the color period containing ``when``.
+
+  Example with cutoff at 19:00 — from 19:00 today until 18:59 tomorrow share
+  the same anchor (today's date); at 19:00 tomorrow a new period begins.
+  """
+  hour = max(0, min(23, int(cutoff_hour)))
+  if when.hour >= hour:
+    return when.date()
+  return when.date() - timedelta(days=1)
+
+
+def _resolve_row_color_index(
+  last_period: date | None,
+  current_period: date,
+  current_index: int,
+) -> int:
+  if last_period is None:
     return 0
-  if last_date == current_date:
+  if last_period == current_period:
     return current_index
   return 1 - current_index
 
@@ -856,9 +872,11 @@ def append_csv_to_excel(
   processed_on: datetime | None = None,
   skip_duplicate_row_check: bool = False,
   extra_csv_paths: List[Path] | None = None,
+  row_color_cutoff_hour: int = 19,
 ) -> Tuple[str, int]:
   sheet_name = sheet_name or current_month_sheet_name()
-  process_date = (processed_on or datetime.now()).date()
+  process_moment = processed_on or datetime.now()
+  color_period = color_period_anchor(process_moment, row_color_cutoff_hour)
   csv_paths = [csv_path, *(extra_csv_paths or [])]
   rows: List[List[str]] = []
   for path in csv_paths:
@@ -913,7 +931,7 @@ def append_csv_to_excel(
       start_row = DATA_START_ROW
       existing_last_data_row = max(existing_last_data_row, 1)
 
-    color_index = _resolve_row_color_index(last_date, process_date, color_index)
+    color_index = _resolve_row_color_index(last_date, color_period, color_index)
     row_fill = ROW_FILLS[color_index]
 
     if not skip_duplicate_row_check:
@@ -963,7 +981,7 @@ def append_csv_to_excel(
     _write_sheet_meta(
       meta_sheet,
       sheet_name,
-      process_date,
+      color_period,
       color_index,
       layout_done=layout_done,
       last_data_row=updated_last_data_row,

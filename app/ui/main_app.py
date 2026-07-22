@@ -5,7 +5,7 @@ from pathlib import Path
 from threading import Thread
 from tkinter import filedialog, ttk
 
-from app.models.schema import AppConfig, Flow
+from app.models.schema import AppConfig, Flow, normalize_cutoff_hour
 from app.models.storage import (
   active_config_path,
   load_config,
@@ -422,6 +422,25 @@ class App(ctk.CTk):
     self.entry_failed_subfolder.pack(side='left', padx=(8, 0))
     self.entry_failed_subfolder.insert(0, self.config_data.failed_subfolder)
 
+    color_row = ctk.CTkFrame(options_body, fg_color='transparent')
+    color_row.pack(fill='x', pady=(12, 0))
+    ctk.CTkLabel(
+      color_row,
+      text='Horário de corte para cor das linhas (0-23):',
+      text_color=THEME_TEXT_SECONDARY,
+    ).pack(side='left')
+    self.entry_row_color_cutoff = ctk.CTkEntry(color_row, width=60, **_entry_kwargs())
+    self.entry_row_color_cutoff.pack(side='left', padx=(8, 0))
+    self.entry_row_color_cutoff.insert(0, str(self.config_data.row_color_cutoff_hour))
+    ctk.CTkLabel(
+      options_body,
+      text='Ex.: com corte às 19h, das 19:00 de hoje até 18:59 de amanhã as linhas ficam na mesma cor; às 19:00 a cor alterna.',
+      font=(FONT, 10),
+      text_color=THEME_TEXT_SECONDARY,
+      wraplength=700,
+      justify='left',
+    ).pack(fill='x', pady=(4, 0))
+
     log_row = ctk.CTkFrame(options_body, fg_color='transparent')
     log_row.pack(fill='x', pady=(8, 0))
     ctk.CTkLabel(log_row, text='Log compartilhado:', text_color=THEME_TEXT_SECONDARY).pack(side='left')
@@ -532,6 +551,9 @@ class App(ctk.CTk):
     self.entry_failed_subfolder.delete(0, 'end')
     self.entry_failed_subfolder.insert(0, self.config_data.failed_subfolder)
 
+    self.entry_row_color_cutoff.delete(0, 'end')
+    self.entry_row_color_cutoff.insert(0, str(self.config_data.row_color_cutoff_hour))
+
     self.entry_shared_log_path.delete(0, 'end')
     if self.config_data.shared_log_path:
       self.entry_shared_log_path.insert(0, self.config_data.shared_log_path)
@@ -570,6 +592,9 @@ class App(ctk.CTk):
     self.config_data.processed_subfolder = self.entry_processed_subfolder.get().strip() or 'processados'
     self.config_data.move_failed_files = bool(self.chk_move_failed.get())
     self.config_data.failed_subfolder = self.entry_failed_subfolder.get().strip() or 'falhas'
+    self.config_data.row_color_cutoff_hour = normalize_cutoff_hour(
+      self.entry_row_color_cutoff.get().strip(),
+    )
     shared_log = self.entry_shared_log_path.get().strip()
     if shared_log.startswith('Padrão:'):
       shared_log = ''

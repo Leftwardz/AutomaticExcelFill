@@ -22,6 +22,7 @@ from app.services.excel_service import (
   ROW_FILL_WHITE,
   TEXT_NUMBER_FORMAT,
   append_csv_to_excel,
+  color_period_anchor,
   current_month_sheet_name,
   excel_full_path,
   read_tab_csv,
@@ -298,6 +299,68 @@ class ExcelServiceTests(unittest.TestCase):
       self.assertEqual(sheet.cell(row=4, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
       self.assertIn(META_SHEET_NAME, workbook.sheetnames)
       self.assertEqual(workbook[META_SHEET_NAME].sheet_state, 'hidden')
+
+  def test_color_period_anchor_uses_cutoff_hour(self):
+    self.assertEqual(
+      color_period_anchor(datetime(2026, 7, 21, 20, 0, 0), 19),
+      date(2026, 7, 21),
+    )
+    self.assertEqual(
+      color_period_anchor(datetime(2026, 7, 22, 10, 0, 0), 19),
+      date(2026, 7, 21),
+    )
+    self.assertEqual(
+      color_period_anchor(datetime(2026, 7, 22, 19, 0, 0), 19),
+      date(2026, 7, 22),
+    )
+
+  def test_row_fill_same_period_across_midnight_before_cutoff(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Col1', 'Col2']
+
+      csv_path.write_text('A\tB\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY,
+        processed_on=datetime(2026, 7, 21, 20, 0, 0),
+        row_color_cutoff_hour=19,
+      )
+      csv_path.write_text('C\tD\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY,
+        processed_on=datetime(2026, 7, 22, 10, 0, 0),
+        row_color_cutoff_hour=19,
+      )
+
+      workbook = load_workbook(excel_path)
+      sheet = workbook[self.SHEET_JULY]
+      self.assertEqual(sheet.cell(row=2, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
+      self.assertEqual(sheet.cell(row=3, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
+
+  def test_row_fill_switches_after_cutoff_hour(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Col1', 'Col2']
+
+      csv_path.write_text('A\tB\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY,
+        processed_on=datetime(2026, 7, 21, 18, 0, 0),
+        row_color_cutoff_hour=19,
+      )
+      csv_path.write_text('C\tD\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY,
+        processed_on=datetime(2026, 7, 21, 20, 0, 0),
+        row_color_cutoff_hour=19,
+      )
+
+      workbook = load_workbook(excel_path)
+      sheet = workbook[self.SHEET_JULY]
+      self.assertEqual(sheet.cell(row=2, column=1).fill.fgColor.rgb, ROW_FILL_WHITE.fgColor.rgb)
+      self.assertEqual(sheet.cell(row=3, column=1).fill.fgColor.rgb, ROW_FILL_PURPLE.fgColor.rgb)
 
   def test_header_style_and_column_width(self):
     with tempfile.TemporaryDirectory() as tmp:

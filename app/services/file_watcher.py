@@ -342,6 +342,8 @@ class _CsvHandler(FileSystemEventHandler):
 
             extra_csv_paths=batch[1:] or None,
 
+            row_color_cutoff_hour=config.row_color_cutoff_hour,
+
           )
 
     except LockNotAcquired as exc:

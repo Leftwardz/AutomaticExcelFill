@@ -23,6 +23,14 @@ def normalize_column_type(value: str) -> ColumnType:
   return 'text'
 
 
+def normalize_cutoff_hour(value: object, default: int = 19) -> int:
+  try:
+    hour = int(value)  # type: ignore[arg-type]
+  except (TypeError, ValueError):
+    return default
+  return max(0, min(23, hour))
+
+
 @dataclass
 class Flow:
   name: str
@@ -88,6 +96,7 @@ class AppConfig:
   move_failed_files: bool = True
   failed_subfolder: str = 'falhas'
   shared_log_path: str = ''
+  row_color_cutoff_hour: int = 19
   flows: List[Flow] = field(default_factory=list)
 
   def to_dict(self) -> dict:
@@ -100,6 +109,7 @@ class AppConfig:
       'move_failed_files': self.move_failed_files,
       'failed_subfolder': self.failed_subfolder,
       'shared_log_path': self.shared_log_path,
+      'row_color_cutoff_hour': self.row_color_cutoff_hour,
       'flows': [flow.to_dict() for flow in self.flows],
     }
 
@@ -115,5 +125,6 @@ class AppConfig:
       move_failed_files=bool(data.get('move_failed_files', True)),
       failed_subfolder=data.get('failed_subfolder', 'falhas'),
       shared_log_path=data.get('shared_log_path', ''),
+      row_color_cutoff_hour=normalize_cutoff_hour(data.get('row_color_cutoff_hour', 19)),
       flows=flows,
     )

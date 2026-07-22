@@ -8,7 +8,7 @@ from unittest import mock
 
 from openpyxl import Workbook
 
-from app.models.schema import AppConfig
+from app.models.schema import AppConfig, normalize_cutoff_hour
 from app.services.coordination import LockNotAcquired, exclusive_lock
 from app.services.excel_crypto import save_workbook_to_path
 from app.services.excel_service import read_tab_csv
@@ -31,6 +31,19 @@ class FileStabilityTests(unittest.TestCase):
       path = Path(tmp) / 'dados.csv'
       path.write_text('a\tb\n', encoding='utf-8')
       self.assertTrue(wait_for_file_stable(path, stable_seconds=0.2, timeout=2))
+
+
+class CutoffHourConfigTests(unittest.TestCase):
+  def test_normalize_cutoff_hour_clamps_values(self):
+    self.assertEqual(normalize_cutoff_hour(19), 19)
+    self.assertEqual(normalize_cutoff_hour(-1), 0)
+    self.assertEqual(normalize_cutoff_hour(30), 23)
+    self.assertEqual(normalize_cutoff_hour('abc'), 19)
+
+  def test_app_config_persists_cutoff_hour(self):
+    config = AppConfig.from_dict({'row_color_cutoff_hour': 20})
+    self.assertEqual(config.row_color_cutoff_hour, 20)
+    self.assertEqual(config.to_dict()['row_color_cutoff_hour'], 20)
 
 
 class NetworkPathTests(unittest.TestCase):
