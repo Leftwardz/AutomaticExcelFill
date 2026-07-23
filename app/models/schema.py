@@ -31,6 +31,21 @@ def normalize_cutoff_hour(value: object, default: int = 19) -> int:
   return max(0, min(23, hour))
 
 
+def normalize_network_interval(
+  value: object,
+  *,
+  default: float,
+  min_value: float,
+  max_value: float,
+) -> float:
+  try:
+    text = str(value).strip().replace(',', '.')
+    number = float(text)
+  except (TypeError, ValueError):
+    return default
+  return max(min_value, min(max_value, number))
+
+
 @dataclass
 class Flow:
   name: str
@@ -97,6 +112,9 @@ class AppConfig:
   failed_subfolder: str = 'falhas'
   shared_log_path: str = ''
   row_color_cutoff_hour: int = 19
+  network_polling_seconds: float = 2.0
+  network_rescan_seconds: float = 30.0
+  network_stability_poll_seconds: float = 0.5
   flows: List[Flow] = field(default_factory=list)
 
   def to_dict(self) -> dict:
@@ -110,6 +128,9 @@ class AppConfig:
       'failed_subfolder': self.failed_subfolder,
       'shared_log_path': self.shared_log_path,
       'row_color_cutoff_hour': self.row_color_cutoff_hour,
+      'network_polling_seconds': self.network_polling_seconds,
+      'network_rescan_seconds': self.network_rescan_seconds,
+      'network_stability_poll_seconds': self.network_stability_poll_seconds,
       'flows': [flow.to_dict() for flow in self.flows],
     }
 
@@ -126,5 +147,23 @@ class AppConfig:
       failed_subfolder=data.get('failed_subfolder', 'falhas'),
       shared_log_path=data.get('shared_log_path', ''),
       row_color_cutoff_hour=normalize_cutoff_hour(data.get('row_color_cutoff_hour', 19)),
+      network_polling_seconds=normalize_network_interval(
+        data.get('network_polling_seconds', 2.0),
+        default=2.0,
+        min_value=1.0,
+        max_value=300.0,
+      ),
+      network_rescan_seconds=normalize_network_interval(
+        data.get('network_rescan_seconds', 30.0),
+        default=30.0,
+        min_value=10.0,
+        max_value=600.0,
+      ),
+      network_stability_poll_seconds=normalize_network_interval(
+        data.get('network_stability_poll_seconds', 0.5),
+        default=0.5,
+        min_value=0.5,
+        max_value=10.0,
+      ),
       flows=flows,
     )

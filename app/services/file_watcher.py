@@ -62,9 +62,6 @@ from app.utils.network_paths import is_likely_network_path
 
 LogCallback = Callable[[str, str], None]
 
-NETWORK_RESCAN_INTERVAL_SECONDS = 30.0
-POLLING_OBSERVER_TIMEOUT_SECONDS = 2.0
-
 
 def _file_signature(path: Path) -> tuple[int, float] | None:
   try:
@@ -227,13 +224,16 @@ class _CsvHandler(FileSystemEventHandler):
 
     watch_path = Path(watch_folder)
 
-
+    network_mode = is_likely_network_path(watch_path)
+    stability_poll_interval = (
+      config.network_stability_poll_seconds if network_mode else 0.5
+    )
 
     if not skip_stability_wait:
 
       self._on_log('info', f'[{flow.name}] Aguardando {path.name} finalizar a cópia...')
 
-      if not wait_for_file_stable(path):
+      if not wait_for_file_stable(path, poll_interval=stability_poll_interval):
         self._on_log(
           'info',
           f'[{flow.name}] {path.name} ainda sendo copiado — nova tentativa no próximo ciclo.',
@@ -251,6 +251,8 @@ class _CsvHandler(FileSystemEventHandler):
       config,
 
       skip_stability_wait=skip_stability_wait,
+
+      stability_poll_interval=stability_poll_interval,
 
     )
 
@@ -549,6 +551,8 @@ class FolderWatcher:
 
     self._use_network_rescan = False
 
+    self._network_rescan_seconds = 30.0
+
 
 
   @property
@@ -584,11 +588,13 @@ class FolderWatcher:
     self._handler = _CsvHandler(load_config, self._on_log)
     self._handler.set_debug_logging(self._on_log)
 
+    config = load_config()
     use_network_mode = is_likely_network_path(folder)
     self._use_network_rescan = use_network_mode
+    self._network_rescan_seconds = config.network_rescan_seconds
 
     if use_network_mode:
-      self._observer = PollingObserver(timeout=POLLING_OBSERVER_TIMEOUT_SECONDS)
+      self._observer = PollingObserver(timeout=config.network_polling_seconds)
       observer_mode = 'polling (rede)'
     else:
       self._observer = Observer()
@@ -609,8 +615,9 @@ class FolderWatcher:
       self._rescan_thread.start()
       self._on_log(
         'info',
-        f'Monitorando pasta: {folder} [{observer_mode}; varredura a cada '
-        f'{int(NETWORK_RESCAN_INTERVAL_SECONDS)}s]',
+        f'Monitorando pasta: {folder} [{observer_mode}; polling '
+        f'{config.network_polling_seconds:g}s; varredura '
+        f'{config.network_rescan_seconds:g}s]',
       )
     else:
       self._on_log('info', f'Monitorando pasta: {folder} [{observer_mode}]')
@@ -700,7 +707,7 @@ class FolderWatcher:
         return
 
   def _periodic_rescan(self, folder: Path) -> None:
-    while not self._stop_event.wait(NETWORK_RESCAN_INTERVAL_SECONDS):
+    while not self._stop_event.wait(self._network_rescan_seconds):
       if self._handler is None:
         continue
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from threading import Thread
 from tkinter import filedialog, ttk
 
-from app.models.schema import AppConfig, Flow, normalize_cutoff_hour
+from app.models.schema import AppConfig, Flow, normalize_cutoff_hour, normalize_network_interval
 from app.models.storage import (
   active_config_path,
   load_config,
@@ -441,6 +441,63 @@ class App(ctk.CTk):
       justify='left',
     ).pack(fill='x', pady=(4, 0))
 
+    network_card, network_body = _section_card(scroll, 'Monitoramento em rede')
+    network_card.pack(fill='x', pady=(0, 12))
+
+    ctk.CTkLabel(
+      network_body,
+      text='Ajuste para testar em ambientes com antivírus/EDR. Valores maiores reduzem atividade no share, mas demoram mais para detectar arquivos.',
+      font=(FONT, 10),
+      text_color=THEME_TEXT_SECONDARY,
+      wraplength=700,
+      justify='left',
+    ).pack(fill='x', pady=(0, 8))
+
+    polling_row = ctk.CTkFrame(network_body, fg_color='transparent')
+    polling_row.pack(fill='x', pady=2)
+    ctk.CTkLabel(
+      polling_row,
+      text='Polling da pasta (segundos):',
+      text_color=THEME_TEXT_SECONDARY,
+    ).pack(side='left')
+    self.entry_network_polling = ctk.CTkEntry(polling_row, width=80, **_entry_kwargs())
+    self.entry_network_polling.pack(side='left', padx=(8, 0))
+    self.entry_network_polling.insert(0, self._format_network_interval(self.config_data.network_polling_seconds))
+
+    rescan_row = ctk.CTkFrame(network_body, fg_color='transparent')
+    rescan_row.pack(fill='x', pady=2)
+    ctk.CTkLabel(
+      rescan_row,
+      text='Varredura de fallback (segundos):',
+      text_color=THEME_TEXT_SECONDARY,
+    ).pack(side='left')
+    self.entry_network_rescan = ctk.CTkEntry(rescan_row, width=80, **_entry_kwargs())
+    self.entry_network_rescan.pack(side='left', padx=(8, 0))
+    self.entry_network_rescan.insert(0, self._format_network_interval(self.config_data.network_rescan_seconds))
+
+    stability_row = ctk.CTkFrame(network_body, fg_color='transparent')
+    stability_row.pack(fill='x', pady=2)
+    ctk.CTkLabel(
+      stability_row,
+      text='Intervalo ao aguardar cópia (segundos):',
+      text_color=THEME_TEXT_SECONDARY,
+    ).pack(side='left')
+    self.entry_network_stability_poll = ctk.CTkEntry(stability_row, width=80, **_entry_kwargs())
+    self.entry_network_stability_poll.pack(side='left', padx=(8, 0))
+    self.entry_network_stability_poll.insert(
+      0,
+      self._format_network_interval(self.config_data.network_stability_poll_seconds),
+    )
+
+    ctk.CTkLabel(
+      network_body,
+      text='Sugestão para teste em rede restritiva: polling 10, varredura 120, aguardar cópia 2. Padrão atual: 2 / 30 / 0,5.',
+      font=(FONT, 10),
+      text_color=THEME_TEXT_SECONDARY,
+      wraplength=700,
+      justify='left',
+    ).pack(fill='x', pady=(6, 0))
+
     log_row = ctk.CTkFrame(options_body, fg_color='transparent')
     log_row.pack(fill='x', pady=(8, 0))
     ctk.CTkLabel(log_row, text='Log compartilhado:', text_color=THEME_TEXT_SECONDARY).pack(side='left')
@@ -505,6 +562,10 @@ class App(ctk.CTk):
       self.entry_shared_log_path.insert(0, 'Padrão: _AutomaticExcelFill/automatic_fill.log')
       self.entry_shared_log_path.configure(text_color=THEME_TEXT_SECONDARY)
 
+  def _format_network_interval(self, value: float) -> str:
+    text = f'{value:g}'.replace('.', ',')
+    return text
+
   def _reload_shared_config(self, *, quiet: bool = False) -> bool:
     folder = self.entry_watch_folder.get().strip() or (self.config_data.watch_folder or '').strip()
     loaded = read_shared_config(folder)
@@ -554,6 +615,22 @@ class App(ctk.CTk):
     self.entry_row_color_cutoff.delete(0, 'end')
     self.entry_row_color_cutoff.insert(0, str(self.config_data.row_color_cutoff_hour))
 
+    self.entry_network_polling.delete(0, 'end')
+    self.entry_network_polling.insert(
+      0,
+      self._format_network_interval(self.config_data.network_polling_seconds),
+    )
+    self.entry_network_rescan.delete(0, 'end')
+    self.entry_network_rescan.insert(
+      0,
+      self._format_network_interval(self.config_data.network_rescan_seconds),
+    )
+    self.entry_network_stability_poll.delete(0, 'end')
+    self.entry_network_stability_poll.insert(
+      0,
+      self._format_network_interval(self.config_data.network_stability_poll_seconds),
+    )
+
     self.entry_shared_log_path.delete(0, 'end')
     if self.config_data.shared_log_path:
       self.entry_shared_log_path.insert(0, self.config_data.shared_log_path)
@@ -594,6 +671,24 @@ class App(ctk.CTk):
     self.config_data.failed_subfolder = self.entry_failed_subfolder.get().strip() or 'falhas'
     self.config_data.row_color_cutoff_hour = normalize_cutoff_hour(
       self.entry_row_color_cutoff.get().strip(),
+    )
+    self.config_data.network_polling_seconds = normalize_network_interval(
+      self.entry_network_polling.get().strip(),
+      default=2.0,
+      min_value=1.0,
+      max_value=300.0,
+    )
+    self.config_data.network_rescan_seconds = normalize_network_interval(
+      self.entry_network_rescan.get().strip(),
+      default=30.0,
+      min_value=10.0,
+      max_value=600.0,
+    )
+    self.config_data.network_stability_poll_seconds = normalize_network_interval(
+      self.entry_network_stability_poll.get().strip(),
+      default=0.5,
+      min_value=0.5,
+      max_value=10.0,
     )
     shared_log = self.entry_shared_log_path.get().strip()
     if shared_log.startswith('Padrão:'):

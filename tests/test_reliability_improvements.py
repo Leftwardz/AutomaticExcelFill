@@ -8,7 +8,7 @@ from unittest import mock
 
 from openpyxl import Workbook
 
-from app.models.schema import AppConfig, normalize_cutoff_hour
+from app.models.schema import AppConfig, normalize_cutoff_hour, normalize_network_interval
 from app.services.coordination import LockNotAcquired, exclusive_lock
 from app.services.excel_crypto import save_workbook_to_path
 from app.services.excel_service import read_tab_csv
@@ -44,6 +44,34 @@ class CutoffHourConfigTests(unittest.TestCase):
     config = AppConfig.from_dict({'row_color_cutoff_hour': 20})
     self.assertEqual(config.row_color_cutoff_hour, 20)
     self.assertEqual(config.to_dict()['row_color_cutoff_hour'], 20)
+
+  def test_normalize_network_interval_clamps_values(self):
+    self.assertEqual(
+      normalize_network_interval(5, default=2.0, min_value=1.0, max_value=300.0),
+      5.0,
+    )
+    self.assertEqual(
+      normalize_network_interval('10,5', default=2.0, min_value=1.0, max_value=300.0),
+      10.5,
+    )
+    self.assertEqual(
+      normalize_network_interval(0, default=2.0, min_value=1.0, max_value=300.0),
+      1.0,
+    )
+    self.assertEqual(
+      normalize_network_interval('abc', default=30.0, min_value=10.0, max_value=600.0),
+      30.0,
+    )
+
+  def test_app_config_persists_network_intervals(self):
+    config = AppConfig.from_dict({
+      'network_polling_seconds': 10,
+      'network_rescan_seconds': 120,
+      'network_stability_poll_seconds': 2,
+    })
+    self.assertEqual(config.network_polling_seconds, 10.0)
+    self.assertEqual(config.network_rescan_seconds, 120.0)
+    self.assertEqual(config.network_stability_poll_seconds, 2.0)
 
 
 class NetworkPathTests(unittest.TestCase):
