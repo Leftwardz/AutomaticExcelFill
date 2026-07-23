@@ -33,7 +33,6 @@ def collect_ready_csv_batch(
   skip_stability_wait: bool = False,
   sibling_stable_seconds: float = 1.0,
   sibling_timeout: float = 45.0,
-  stability_poll_interval: float = 0.5,
 ) -> list[Path]:
   """Collect all stable CSV files in the watch folder that match the same flow."""
   candidates = [
@@ -50,7 +49,6 @@ def collect_ready_csv_batch(
       candidate,
       stable_seconds=sibling_stable_seconds,
       timeout=sibling_timeout,
-      poll_interval=stability_poll_interval,
     ):
       ready.append(candidate)
   ready.sort(key=lambda path: path.name.lower())
