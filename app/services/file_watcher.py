@@ -62,8 +62,9 @@ from app.utils.network_paths import is_likely_network_path
 
 LogCallback = Callable[[str, str], None]
 
-NETWORK_RESCAN_INTERVAL_SECONDS = 30.0
-POLLING_OBSERVER_TIMEOUT_SECONDS = 2.0
+NETWORK_RESCAN_INTERVAL_SECONDS = 120.0
+POLLING_OBSERVER_TIMEOUT_SECONDS = 10.0
+NETWORK_FILE_STABILITY_POLL_INTERVAL = 2.0
 
 
 def _file_signature(path: Path) -> tuple[int, float] | None:
@@ -227,13 +228,14 @@ class _CsvHandler(FileSystemEventHandler):
 
     watch_path = Path(watch_folder)
 
-
+    network_mode = is_likely_network_path(watch_path)
+    stability_poll_interval = NETWORK_FILE_STABILITY_POLL_INTERVAL if network_mode else 0.5
 
     if not skip_stability_wait:
 
       self._on_log('info', f'[{flow.name}] Aguardando {path.name} finalizar a cópia...')
 
-      if not wait_for_file_stable(path):
+      if not wait_for_file_stable(path, poll_interval=stability_poll_interval):
         self._on_log(
           'info',
           f'[{flow.name}] {path.name} ainda sendo copiado — nova tentativa no próximo ciclo.',
@@ -251,6 +253,8 @@ class _CsvHandler(FileSystemEventHandler):
       config,
 
       skip_stability_wait=skip_stability_wait,
+
+      stability_poll_interval=stability_poll_interval,
 
     )
 
