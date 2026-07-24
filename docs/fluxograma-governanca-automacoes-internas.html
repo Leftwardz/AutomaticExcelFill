@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processo de Desenvolvimento, Validação e Implantação de Automações Internas</title>
+  <style>
+    :root {
+      --navy: #1e3a5f;
+      --navy-light: #2c5282;
+      --blue: #3182ce;
+      --blue-soft: #ebf4ff;
+      --gray-50: #f7fafc;
+      --gray-100: #edf2f7;
+      --gray-200: #e2e8f0;
+      --gray-600: #4a5568;
+      --gray-800: #2d3748;
+      --green: #276749;
+      --green-soft: #c6f6d5;
+      --amber: #b7791f;
+      --amber-soft: #fef3c7;
+      --purple: #553c9a;
+      --purple-soft: #e9d8fd;
+      --teal: #285e61;
+      --teal-soft: #b2f5ea;
+      --white: #ffffff;
+      --shadow: 0 2px 8px rgba(30, 58, 95, 0.12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-800);
+      padding: 32px 24px 48px;
+      line-height: 1.45;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+      color: var(--white);
+      padding: 28px 36px 24px;
+      border-bottom: 4px solid var(--blue);
+    }
+
+    .header .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.15);
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.35;
+      max-width: 900px;
+    }
+
+    .header .subtitle {
+      margin-top: 10px;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      padding: 16px 36px;
+      background: var(--gray-100);
+      border-bottom: 1px solid var(--gray-200);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .diagram-wrap {
+      padding: 24px 20px 32px;
+      overflow-x: auto;
+    }
+
+    table.swimlane {
+      width: 100%;
+      min-width: 1100px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.swimlane col.lane-label { width: 200px; }
+    table.swimlane col.lane-content { width: auto; }
+
+    table.swimlane td, table.swimlane th {
+      vertical-align: top;
+      border: 1px solid var(--gray-200);
+    }
+
+    .lane-header {
+      writing-mode: horizontal-tb;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 12px 10px;
+      text-align: center;
+      color: var(--white);
+      min-height: 52px;
+    }
+
+  .lane-business { background: var(--navy); }
+  .lane-user { background: var(--blue); }
+  .lane-ti { background: var(--teal); }
+  .lane-manager { background: var(--purple); }
+  .lane-system { background: var(--gray-600); }
+
+    .lane-body {
+      padding: 14px 16px;
+      min-height: 88px;
+      background: var(--white);
+      position: relative;
+    }
+
+    .lane-body.alt-business { background: var(--blue-soft); }
+    .lane-body.alt-user { background: #f0f7ff; }
+    .lane-body.alt-ti { background: var(--teal-soft); }
+    .lane-body.alt-manager { background: var(--purple-soft); }
+    .lane-body.alt-system { background: var(--gray-100); }
+
+    .step {
+      border: 2px solid var(--navy);
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: var(--white);
+      box-shadow: var(--shadow);
+      max-width: 720px;
+    }
+
+    .step.system-step { border-color: var(--gray-600); }
+    .step.ti-step { border-color: var(--teal); }
+    .step.user-step { border-color: var(--blue); }
+    .step.manager-step { border-color: var(--purple); }
+
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--navy);
+      color: var(--white);
+      font-size: 12px;
+      font-weight: 700;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .step-num.ti { background: var(--teal); }
+    .step-num.user { background: var(--blue); }
+    .step-num.manager { background: var(--purple); }
+    .step-num.system { background: var(--gray-600); }
+
+    .step-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: flex-start;
+    }
+
+    .step-title.ti { color: var(--teal); }
+    .step-title.user { color: var(--blue); }
+    .step-title.manager { color: var(--purple); }
+    .step-title.system { color: var(--gray-800); }
+
+    .step ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+      color: var(--gray-600);
+    }
+
+    .step ul li { margin-bottom: 3px; }
+
+    .arrow-row td {
+      border: none !important;
+      padding: 0 !important;
+      height: 28px;
+      background: transparent !important;
+    }
+
+    .arrow-cell {
+      text-align: center;
+      color: var(--navy);
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 28px;
+      opacity: 0.55;
+    }
+
+    .handoff {
+      font-size: 11px;
+      color: var(--amber);
+      font-weight: 600;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--gray-200);
+    }
+
+    .approval-chain {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+
+    .approval-box {
+      background: var(--purple-soft);
+      border: 1px solid var(--purple);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-weight: 600;
+      color: var(--purple);
+    }
+
+    .approval-arrow { color: var(--purple); font-weight: 700; }
+
+    .audit-section {
+      margin: 0 20px 28px;
+      border: 2px solid var(--green);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .audit-header {
+      background: var(--green);
+      color: var(--white);
+      padding: 14px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .audit-header svg { flex-shrink: 0; }
+
+    .audit-body {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+      padding: 18px 20px;
+      background: var(--green-soft);
+    }
+
+    .audit-item {
+      background: var(--white);
+      border: 1px solid #9ae6b4;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .audit-item::before {
+      content: "✓";
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      background: var(--green);
+      color: white;
+      border-radius: 50%;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .loop-note {
+      margin: 0 20px 24px;
+      padding: 14px 18px;
+      background: var(--amber-soft);
+      border-left: 4px solid var(--amber);
+      border-radius: 0 6px 6px 0;
+      font-size: 12px;
+      color: var(--gray-800);
+    }
+
+    .loop-note strong { color: var(--amber); }
+
+    .footer {
+      padding: 16px 36px 24px;
+      font-size: 11px;
+      color: var(--gray-600);
+      border-top: 1px solid var(--gray-200);
+      text-align: center;
+    }
+
+    @media print {
+      body { padding: 0; background: white; }
+      .page { box-shadow: none; border: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="badge">Governança · Ciclo de Vida · PCI DSS</div>
+      <h1>Processo de Desenvolvimento, Validação e Implantação de Automações Internas com Rastreabilidade e Controle de Auditoria</h1>
+      <p class="subtitle">Fluxo BPMN com raias (swimlanes) — Scripts e aplicações Python internas</p>
+    </header>
+
+    <div class="legend">
+      <div class="legend-item"><span class="legend-swatch" style="background:#1e3a5f"></span> Área de Negócio / Desenvolvedor</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#3182ce"></span> Usuário da Área / Validador</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#285e61"></span> TI / Segurança da Informação</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#553c9a"></span> Gestor / Aprovador</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#4a5568"></span> Sistema de Controle (Git + GMUD)</div>
+    </div>
+
+    <div class="diagram-wrap">
+      <table class="swimlane" role="presentation">
+        <colgroup>
+          <col class="lane-label" />
+          <col class="lane-content" />
+        </colgroup>
+
+        <!-- ETAPA 1 -->
+        <tr>
+          <td class="lane-header lane-business">Área de Negócio /<br/>Desenvolvedor</td>
+          <td class="lane-body alt-business">
+            <div class="step">
+              <div class="step-title"><span class="step-num">1</span> Identificação da necessidade</div>
+              <ul>
+                <li>Área identifica atividade manual passível de automação</li>
+                <li>Documenta objetivo, benefício esperado e escopo</li>
+                <li>Avalia se há acesso a dados sensíveis ou ambiente crítico</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 2 -->
+        <tr>
+          <td class="lane-header lane-business">Área de Negócio /<br/>Desenvolvedor</td>
+          <td class="lane-body alt-business">
+            <div class="step">
+              <div class="step-title"><span class="step-num">2</span> Desenvolvimento</div>
+              <ul>
+                <li>Desenvolvedor cria aplicação/script Python</li>
+                <li>Código armazenado em repositório Git</li>
+                <li>Controle de versão (ex.: v1.0.0)</li>
+                <li>Documentação básica: objetivo, dados processados, responsáveis, limitações e arquitetura</li>
+              </ul>
+              <div class="handoff">→ Registro no Git (Sistema de Controle)</div>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 3 -->
+        <tr>
+          <td class="lane-header lane-business">Área de Negócio /<br/>Desenvolvedor</td>
+          <td class="lane-body alt-business">
+            <div class="step">
+              <div class="step-title"><span class="step-num">3</span> Testes técnicos</div>
+              <ul>
+                <li>Desenvolvedor executa testes iniciais</li>
+                <li>Valida cenários positivos e negativos</li>
+                <li>Registra evidências dos testes</li>
+              </ul>
+              <ul style="margin-top:6px">
+                <li><em>Ex.:</em> arquivo correto processado; arquivo inválido tratado; erro identificado corretamente</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 4 -->
+        <tr>
+          <td class="lane-header lane-business">Área de Negócio /<br/>Desenvolvedor</td>
+          <td class="lane-body alt-business">
+            <div class="step">
+              <div class="step-title"><span class="step-num">4</span> Encaminhamento para teste de aceitação</div>
+              <ul>
+                <li>Desenvolvedor envia formulário de teste ao usuário da área</li>
+              </ul>
+              <div class="handoff">→ Usuário da Área / Validador</div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td class="lane-header lane-user">Usuário da Área /<br/>Validador</td>
+          <td class="lane-body alt-user">
+            <div class="step user-step">
+              <div class="step-title user"><span class="step-num user">4</span> Teste de aceitação pelo usuário</div>
+              <ul>
+                <li>Usuário executa testes reais no ambiente de negócio</li>
+                <li>Usuário retorna formulário preenchido por e-mail</li>
+                <li>Evidência será anexada na GMUD</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 5 -->
+        <tr>
+          <td class="lane-header lane-ti">TI / Segurança<br/>da Informação</td>
+          <td class="lane-body alt-ti">
+            <div class="step ti-step">
+              <div class="step-title ti"><span class="step-num ti">5</span> Revisão e avaliação técnica</div>
+              <ul>
+                <li>Revisão por outra pessoa (TI, analista ou responsável técnico)</li>
+                <li>Avaliar: código, permissões, local de instalação, riscos e impacto no ambiente</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 6 -->
+        <tr>
+          <td class="lane-header lane-system">Sistema de Controle<br/>(Git + GMUD)</td>
+          <td class="lane-body alt-system">
+            <div class="step system-step">
+              <div class="step-title system"><span class="step-num system">6</span> Abertura da GMUD</div>
+              <ul>
+                <li>Objetivo, versão da aplicação, responsável pelo desenvolvimento</li>
+                <li>Evidências de teste, documentação, plano de rollback</li>
+                <li>Local de instalação e riscos identificados</li>
+              </ul>
+              <ul style="margin-top:6px">
+                <li><strong>Anexos:</strong> documento de testes, aprovação do usuário, documentação técnica, evidências</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 7 -->
+        <tr>
+          <td class="lane-header lane-business">Área de Negócio /<br/>Desenvolvedor</td>
+          <td class="lane-body alt-business">
+            <div class="step" style="max-width:340px;display:inline-block;margin-right:12px">
+              <div class="step-title"><span class="step-num">7</span> Desenvolvedor</div>
+              <ul><li>Aprova e registra data/versão</li></ul>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td class="lane-header lane-ti">TI / Segurança<br/>da Informação</td>
+          <td class="lane-body alt-ti">
+            <div class="step ti-step" style="max-width:340px;display:inline-block;margin-right:12px">
+              <div class="step-title ti"><span class="step-num ti">7</span> Revisor técnico</div>
+              <ul><li>Revisão e aprovação registrada</li></ul>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td class="lane-header lane-manager">Gestor /<br/>Aprovador</td>
+          <td class="lane-body alt-manager">
+            <div class="step manager-step">
+              <div class="step-title manager"><span class="step-num manager">7</span> Aprovação</div>
+              <div class="approval-chain">
+                <span class="approval-box">Desenvolvedor</span>
+                <span class="approval-arrow">→</span>
+                <span class="approval-box">Revisor</span>
+                <span class="approval-arrow">→</span>
+                <span class="approval-box">Gestor</span>
+                <span class="approval-arrow">→</span>
+                <span class="approval-box">TI / Security*</span>
+              </div>
+              <ul style="margin-top:8px">
+                <li>Registrar: quem aprovou, data e versão aprovada</li>
+                <li><em>* Quando aplicável (dados sensíveis / ambiente crítico)</em></li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 8 -->
+        <tr>
+          <td class="lane-header lane-ti">TI / Segurança<br/>da Informação</td>
+          <td class="lane-body alt-ti">
+            <div class="step ti-step">
+              <div class="step-title ti"><span class="step-num ti">8</span> Implantação</div>
+              <ul>
+                <li>Instalar aplicação no computador/pasta definida</li>
+                <li>Garantir permissões adequadas (princípio do menor privilégio)</li>
+                <li>Registrar local e versão instalada</li>
+                <li>Confirmar que versão instalada = versão aprovada na GMUD</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 9 -->
+        <tr>
+          <td class="lane-header lane-user">Usuário da Área /<br/>Validador</td>
+          <td class="lane-body alt-user">
+            <div class="step user-step">
+              <div class="step-title user"><span class="step-num user">9</span> Operação e monitoramento</div>
+              <ul>
+                <li>Usuários utilizam a aplicação em produção</li>
+                <li>Registrar logs quando aplicável: usuário, data/hora, arquivos processados, resultado</li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="arrow-row"><td></td><td class="arrow-cell">▼</td></tr>
+
+        <!-- ETAPA 10 -->
+        <tr>
+          <td class="lane-header lane-business">Área de Negócio /<br/>Desenvolvedor</td>
+          <td class="lane-body alt-business">
+            <div class="step">
+              <div class="step-title"><span class="step-num">10</span> Correções e novas versões</div>
+              <ul>
+                <li>Nova versão (ex.: v1.0.0 → v1.0.1)</li>
+                <li>Atualizar: código Git, CHANGELOG, testes e GMUD</li>
+                <li><strong>Nunca</strong> substituir versão aprovada sem rastreabilidade</li>
+              </ul>
+              <div class="handoff">↺ Retorna ao fluxo a partir da Etapa 2 (Desenvolvimento)</div>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="loop-note">
+      <strong>Ciclo de mudança:</strong> Qualquer alteração em automação já implantada reinicia o fluxo de governança (desenvolvimento → testes → GMUD → aprovação → implantação), preservando histórico completo para auditoria.
+    </div>
+
+    <section class="audit-section" aria-label="Evidências para Auditoria">
+      <div class="audit-header">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+        Evidências para Auditoria (PCI DSS / Controles Internos)
+      </div>
+      <div class="audit-body">
+        <div class="audit-item">Código-fonte versionado no Git</div>
+        <div class="audit-item">Histórico de alterações (CHANGELOG)</div>
+        <div class="audit-item">Versão identificada (tag/release)</div>
+        <div class="audit-item">Testes realizados (técnico + aceitação)</div>
+        <div class="audit-item">Aprovação formal do usuário</div>
+        <div class="audit-item">GMUD aprovada e arquivada</div>
+        <div class="audit-item">Registro de implantação</div>
+        <div class="audit-item">Controle de acesso e permissões</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      Documento de referência para governança de automações internas · Compatível com requisitos de rastreabilidade e auditoria
+    </footer>
+  </div>
+</body>
+</html>
