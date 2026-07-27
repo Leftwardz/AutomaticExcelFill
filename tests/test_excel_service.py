@@ -513,6 +513,39 @@ class ExcelServiceTests(unittest.TestCase):
       self.assertEqual(sheet.cell(row=2, column=1).value, 'A')
       self.assertEqual(sheet.cell(row=3, column=1).value, 'C')
 
+  def test_append_after_manual_row_deletion_uses_scanned_last_row(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      csv_path = Path(tmp) / 'dados.csv'
+      excel_path = Path(tmp) / 'saida.xlsx'
+      headers = ['Col1', 'Col2']
+
+      csv_path.write_text('A\tB\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+      )
+      csv_path.write_text('C\tD\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+      )
+
+      workbook = load_workbook(excel_path)
+      sheet = workbook[self.SHEET_JULY]
+      for col_index in range(1, 3):
+        sheet.cell(row=3, column=col_index).value = None
+      workbook.save(excel_path)
+      workbook.close()
+
+      csv_path.write_text('E\tF\n', encoding='utf-8')
+      append_csv_to_excel(
+        csv_path, excel_path, headers, sheet_name=self.SHEET_JULY, processed_on=self.JULY_2026,
+      )
+
+      workbook = load_workbook(excel_path)
+      sheet = workbook[self.SHEET_JULY]
+      self.assertEqual(sheet.cell(row=2, column=1).value, 'A')
+      self.assertEqual(sheet.cell(row=3, column=1).value, 'E')
+      self.assertIsNone(sheet.cell(row=4, column=1).value)
+
   def test_last_data_row_cached_in_meta(self):
     with tempfile.TemporaryDirectory() as tmp:
       csv_path = Path(tmp) / 'dados.csv'

@@ -343,8 +343,10 @@ def _resolve_start_row(
       return DATA_START_ROW, 1
     return 1, 1
 
-  if cached_last_data_row is not None and cached_last_data_row >= 1:
-    return max(cached_last_data_row + 1, DATA_START_ROW), cached_last_data_row
+  if cached_last_data_row is not None and cached_last_data_row >= DATA_START_ROW:
+    cached_values = _row_values_from_sheet(sheet, cached_last_data_row, column_count)
+    if not _row_is_blank(cached_values):
+      return max(cached_last_data_row + 1, DATA_START_ROW), cached_last_data_row
 
   resolved_last = _last_data_row(sheet, column_count)
   return max(resolved_last + 1, DATA_START_ROW), resolved_last
