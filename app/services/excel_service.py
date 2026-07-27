@@ -336,14 +336,18 @@ def _write_day_color_state(meta_sheet: Worksheet, sheet_name: str, process_date:
 def _resolve_start_row(
   sheet: Worksheet,
   column_count: int,
+  cached_last_data_row: int | None,
 ) -> Tuple[int, int]:
   if _sheet_is_empty(sheet):
     if sheet.max_row >= 1 and sheet.cell(row=1, column=1).value:
       return DATA_START_ROW, 1
     return 1, 1
 
-  # Always scan the sheet: the cached last row can be ahead of real content when
-  # rows were cleared or deleted manually in Excel.
+  if cached_last_data_row is not None and cached_last_data_row >= DATA_START_ROW:
+    cached_values = _row_values_from_sheet(sheet, cached_last_data_row, column_count)
+    if not _row_is_blank(cached_values):
+      return max(cached_last_data_row + 1, DATA_START_ROW), cached_last_data_row
+
   resolved_last = _last_data_row(sheet, column_count)
   return max(resolved_last + 1, DATA_START_ROW), resolved_last
 
@@ -923,6 +927,7 @@ def append_csv_to_excel(
     start_row, existing_last_data_row = _resolve_start_row(
       sheet,
       fill_column_count,
+      cached_last_data_row,
     )
     if start_row == 1 and headers:
       start_row = DATA_START_ROW
