@@ -37,12 +37,17 @@ def resolve_config_path(watch_folder: str = '') -> Path:
 def _atomic_write_json(path: Path, data: dict) -> None:
   path.parent.mkdir(parents=True, exist_ok=True)
   tmp_path = path.with_suffix(path.suffix + '.tmp')
-  with open(tmp_path, 'w', encoding='utf-8') as handle:
-    json.dump(data, handle, ensure_ascii=False, indent=2)
-  backup_path = path.with_suffix(path.suffix + '.bak')
-  if path.is_file():
-    shutil.copy2(path, backup_path)
-  os.replace(tmp_path, path)
+  try:
+    with open(tmp_path, 'w', encoding='utf-8') as handle:
+      json.dump(data, handle, ensure_ascii=False, indent=2)
+    backup_path = path.with_suffix(path.suffix + '.bak')
+    if path.is_file():
+      shutil.copy2(path, backup_path)
+    os.replace(tmp_path, path)
+    tmp_path = None
+  finally:
+    if tmp_path is not None and tmp_path.exists():
+      tmp_path.unlink(missing_ok=True)
 
 
 def read_shared_config(watch_folder: str) -> AppConfig | None:

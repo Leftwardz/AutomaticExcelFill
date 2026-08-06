@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -21,6 +23,10 @@ from app.utils.app_data_paths import (
   app_data_dir,
   locks_root,
   shared_config_path,
+)
+from app.utils.temp_cleanup import (
+  cleanup_directory_temp_files,
+  cleanup_excel_directories,
 )
 from app.utils.network_paths import is_likely_network_path, is_unc_path
 
@@ -216,6 +222,57 @@ class AtomicSaveTests(unittest.TestCase):
       workbook.active['A1'] = 'ok'
       save_workbook_to_path(workbook, target)
       self.assertTrue(target.is_file())
+
+  def test_save_workbook_removes_part_file_on_failure(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      target = Path(tmp) / 'saida.xlsx'
+      workbook = Workbook()
+      workbook.active['A1'] = 'ok'
+      part_path = target.with_name(f'.{target.stem}{target.suffix}.part')
+
+      with mock.patch.object(workbook, 'save', side_effect=RuntimeError('falha')):
+        with self.assertRaises(RuntimeError):
+          save_workbook_to_path(workbook, target)
+
+      self.assertFalse(part_path.exists())
+      self.assertFalse(target.exists())
+
+
+class TempCleanupTests(unittest.TestCase):
+  def test_cleanup_removes_stale_part_files(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      directory = Path(tmp)
+      stale = directory / '.relatorio.xlsx.part'
+      stale.write_bytes(b'old')
+      past = time.time() - 7200
+      os.utime(stale, (past, past))
+
+      removed = cleanup_directory_temp_files(directory, max_age_seconds=60)
+      self.assertEqual(removed, [stale])
+      self.assertFalse(stale.exists())
+
+  def test_cleanup_keeps_recent_part_files(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      directory = Path(tmp)
+      recent = directory / '.relatorio.xlsx.part'
+      recent.write_bytes(b'new')
+
+      removed = cleanup_directory_temp_files(directory, max_age_seconds=3600)
+      self.assertEqual(removed, [])
+      self.assertTrue(recent.exists())
+
+  def test_cleanup_scans_year_subfolders(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      root = Path(tmp) / 'planilhas'
+      year_dir = root / '2026'
+      year_dir.mkdir(parents=True)
+      stale = year_dir / '.dados.xlsx.part'
+      stale.write_bytes(b'old')
+      past = time.time() - 7200
+      os.utime(stale, (past, past))
+
+      removed = cleanup_excel_directories([root], max_age_seconds=60)
+      self.assertEqual(removed, [stale])
 
 
 if __name__ == '__main__':

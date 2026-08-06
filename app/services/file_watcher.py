@@ -43,6 +43,7 @@ from app.services.coordination import (
 )
 
 from app.utils.app_data_paths import locks_root, migrate_legacy_app_data
+from app.utils.temp_cleanup import cleanup_excel_directories
 
 from app.services.csv_batch import collect_ready_csv_batch
 
@@ -308,7 +309,9 @@ class _CsvHandler(FileSystemEventHandler):
 
             if not item.is_file():
 
-              return
+              raise FileNotFoundError(
+                f'Arquivo não encontrado durante o processamento: {item.name}',
+              )
 
             stack.enter_context(
 
@@ -592,6 +595,18 @@ class FolderWatcher:
     use_network_mode = is_likely_network_path(folder)
     self._use_network_rescan = use_network_mode
     self._network_rescan_seconds = config.network_rescan_seconds
+
+    excel_dirs = [
+      flow.excel_directory
+      for flow in config.flows
+      if (flow.excel_directory or '').strip()
+    ]
+    if excel_dirs:
+      removed = cleanup_excel_directories(excel_dirs)
+      if removed:
+        names = ', '.join(path.name for path in removed[:3])
+        extra = f' (+{len(removed) - 3} outros)' if len(removed) > 3 else ''
+        self._on_log('info', f'Limpeza de temporários antigos: {names}{extra}')
 
     if use_network_mode:
       self._observer = PollingObserver(timeout=config.network_polling_seconds)
