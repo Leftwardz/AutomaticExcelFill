@@ -12,7 +12,7 @@ from openpyxl import Workbook
 
 from app.models.schema import AppConfig, normalize_cutoff_hour, normalize_network_interval
 from app.services.coordination import LockNotAcquired, exclusive_lock
-from app.services.excel_crypto import save_workbook_to_path
+from app.services.excel_crypto import ExcelFileError, save_workbook_to_path
 from app.services.excel_service import read_tab_csv
 from app.services.file_stability import wait_for_file_stable
 from app.services.file_watcher import _CsvHandler
@@ -223,26 +223,26 @@ class AtomicSaveTests(unittest.TestCase):
       save_workbook_to_path(workbook, target)
       self.assertTrue(target.is_file())
 
-  def test_save_workbook_removes_part_file_on_failure(self):
+  def test_save_workbook_removes_temp_file_on_failure(self):
     with tempfile.TemporaryDirectory() as tmp:
       target = Path(tmp) / 'saida.xlsx'
       workbook = Workbook()
       workbook.active['A1'] = 'ok'
-      part_path = target.with_name(f'.{target.stem}{target.suffix}.part')
 
       with mock.patch.object(workbook, 'save', side_effect=RuntimeError('falha')):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ExcelFileError):
           save_workbook_to_path(workbook, target)
 
-      self.assertFalse(part_path.exists())
       self.assertFalse(target.exists())
+      leftovers = list(directory.glob('*.xlsx.tmp')) if (directory := target.parent) else []
+      self.assertEqual(leftovers, [])
 
 
 class TempCleanupTests(unittest.TestCase):
-  def test_cleanup_removes_stale_part_files(self):
+  def test_cleanup_removes_stale_legacy_temp_files(self):
     with tempfile.TemporaryDirectory() as tmp:
       directory = Path(tmp)
-      stale = directory / '.relatorio.xlsx.part'
+      stale = directory / 'tmpabc123.xlsx.tmp'
       stale.write_bytes(b'old')
       past = time.time() - 7200
       os.utime(stale, (past, past))
@@ -251,10 +251,10 @@ class TempCleanupTests(unittest.TestCase):
       self.assertEqual(removed, [stale])
       self.assertFalse(stale.exists())
 
-  def test_cleanup_keeps_recent_part_files(self):
+  def test_cleanup_keeps_recent_temp_files(self):
     with tempfile.TemporaryDirectory() as tmp:
       directory = Path(tmp)
-      recent = directory / '.relatorio.xlsx.part'
+      recent = directory / 'tmpabc123.xlsx.tmp'
       recent.write_bytes(b'new')
 
       removed = cleanup_directory_temp_files(directory, max_age_seconds=3600)
@@ -266,7 +266,7 @@ class TempCleanupTests(unittest.TestCase):
       root = Path(tmp) / 'planilhas'
       year_dir = root / '2026'
       year_dir.mkdir(parents=True)
-      stale = year_dir / '.dados.xlsx.part'
+      stale = year_dir / 'tmpabc123.xlsx.tmp'
       stale.write_bytes(b'old')
       past = time.time() - 7200
       os.utime(stale, (past, past))

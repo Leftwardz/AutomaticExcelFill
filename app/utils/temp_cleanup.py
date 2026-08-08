@@ -36,7 +36,12 @@ def cleanup_directory_temp_files(
   if not directory.is_dir():
     return removed
 
-  patterns = (f'*{EXCEL_PART_SUFFIX}', f'*{LEGACY_EXCEL_TEMP_SUFFIX}', f'*{CONFIG_TEMP_SUFFIX}')
+  patterns = (
+    f'*{EXCEL_PART_SUFFIX}',
+    f'*{LEGACY_EXCEL_TEMP_SUFFIX}',
+    'tmp*.xlsx.tmp',
+    f'*{CONFIG_TEMP_SUFFIX}',
+  )
   seen: set[Path] = set()
   for pattern in patterns:
     for path in directory.glob(pattern):

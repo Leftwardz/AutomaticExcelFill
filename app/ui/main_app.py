@@ -40,6 +40,7 @@ from app.ui.log_view import ColoredLogView
 from app.ui.theme_assets import gradient_ctk_image
 from app.ui.ttk_theme import ARTEMIS_SCROLLBAR_V_STYLE, ARTEMIS_TREEVIEW_STYLE, apply_artemis_ttk_theme
 from app.ui.window_utils import create_scrollable_frame, schedule_center_window
+from app.utils.crash_guard import register_main_window
 
 
 def _entry_kwargs(**extra):
@@ -112,6 +113,7 @@ class App(ctk.CTk):
       self.after(500, self._start_watcher)
 
     self.protocol('WM_DELETE_WINDOW', self._on_close)
+    register_main_window(self)
     schedule_center_window(self)
 
   def _build_sidebar(self):
@@ -829,6 +831,8 @@ class App(ctk.CTk):
     def worker():
       try:
         self.watcher.process_file_now(selected_path)
+      except Exception as exc:
+        self._add_log('error', f'Erro no processamento manual: {exc}')
       finally:
         self.after(0, self._finish_manual_process)
 
@@ -850,7 +854,10 @@ class App(ctk.CTk):
     header = f'Arquivo: {log_path}'
 
     def worker():
-      content = read_job_log_tail(log_path)
+      try:
+        content = read_job_log_tail(log_path)
+      except Exception as exc:
+        content = f'Não foi possível ler o log: {exc}'
       self.after(0, lambda: self._apply_shared_log(header, content))
 
     Thread(target=worker, daemon=True).start()

@@ -309,9 +309,11 @@ class _CsvHandler(FileSystemEventHandler):
 
             if not item.is_file():
 
-              raise FileNotFoundError(
-                f'Arquivo não encontrado durante o processamento: {item.name}',
+              self._on_log(
+                'error',
+                f'[{flow.name}] Arquivo não encontrado durante o processamento: {item.name}',
               )
+              return
 
             stack.enter_context(
 
@@ -489,46 +491,34 @@ class _CsvHandler(FileSystemEventHandler):
 
 
   def _archive_source(self, path: Path, config: AppConfig) -> None:
-
     if not config.move_processed_files:
-
       return
-
-    target_dir = path.parent / config.processed_subfolder
-
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    destination = target_dir / path.name
-
-    if destination.exists():
-
-      stamp = time.strftime('%Y%m%d_%H%M%S')
-
-      destination = target_dir / f'{path.stem}_{stamp}{path.suffix}'
-
-    shutil.move(str(path), str(destination))
+    try:
+      target_dir = path.parent / config.processed_subfolder
+      target_dir.mkdir(parents=True, exist_ok=True)
+      destination = target_dir / path.name
+      if destination.exists():
+        stamp = time.strftime('%Y%m%d_%H%M%S')
+        destination = target_dir / f'{path.stem}_{stamp}{path.suffix}'
+      shutil.move(str(path), str(destination))
+    except OSError as exc:
+      self._on_log('error', f'Não foi possível arquivar {path.name}: {exc}')
 
 
 
   def _archive_failed(self, path: Path, config: AppConfig) -> None:
-
     if not config.move_failed_files or not path.is_file():
-
       return
-
-    target_dir = path.parent / config.failed_subfolder
-
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    destination = target_dir / path.name
-
-    if destination.exists():
-
-      stamp = time.strftime('%Y%m%d_%H%M%S')
-
-      destination = target_dir / f'{path.stem}_{stamp}{path.suffix}'
-
-    shutil.move(str(path), str(destination))
+    try:
+      target_dir = path.parent / config.failed_subfolder
+      target_dir.mkdir(parents=True, exist_ok=True)
+      destination = target_dir / path.name
+      if destination.exists():
+        stamp = time.strftime('%Y%m%d_%H%M%S')
+        destination = target_dir / f'{path.stem}_{stamp}{path.suffix}'
+      shutil.move(str(path), str(destination))
+    except OSError as exc:
+      self._on_log('error', f'Não foi possível mover {path.name} para falhas: {exc}')
 
 
 
@@ -688,69 +678,74 @@ class FolderWatcher:
 
 
   def _initial_scan(self, folder: Path) -> None:
-
-    time.sleep(0.5)
-
-    config = load_config()
-
-    started_flows: set[str] = set()
-
-    for flow in config.flows:
-
-      if not flow.enabled:
-
-        continue
-
-      if flow.id in started_flows:
-
-        continue
-
-      candidates = list(iter_matching_files(folder, flow.source_filename))
-
-      if not candidates:
-
-        continue
-
-      if self._handler is not None:
-
-        self._handler._process_file(candidates[0])
-
-      started_flows.add(flow.id)
-
-      if self._stop_event.is_set():
-
-        return
-
-  def _periodic_rescan(self, folder: Path) -> None:
-    while not self._stop_event.wait(self._network_rescan_seconds):
-      if self._handler is None:
-        continue
+    try:
+      time.sleep(0.5)
 
       config = load_config()
+
       started_flows: set[str] = set()
 
       for flow in config.flows:
+
         if not flow.enabled:
+
           continue
+
         if flow.id in started_flows:
+
           continue
 
-        candidates = [
-          path
-          for path in iter_matching_files(folder, flow.source_filename)
-          if self._handler.should_process_rescan_candidate(path)
-        ]
+        candidates = list(iter_matching_files(folder, flow.source_filename))
+
         if not candidates:
+
           continue
 
-        self._on_log(
-          'info',
-          f'[rede] Varredura encontrou {len(candidates)} arquivo(s) pendente(s) para '
-          f'"{flow.name}": {", ".join(path.name for path in candidates)}',
-        )
-        self._handler._process_file(candidates[0])
+        if self._handler is not None:
+
+          self._handler._process_file(candidates[0])
+
         started_flows.add(flow.id)
 
         if self._stop_event.is_set():
+
           return
+    except Exception as exc:
+      self._on_log('error', f'Erro na varredura inicial: {exc}')
+
+  def _periodic_rescan(self, folder: Path) -> None:
+    while not self._stop_event.wait(self._network_rescan_seconds):
+      try:
+        if self._handler is None:
+          continue
+
+        config = load_config()
+        started_flows: set[str] = set()
+
+        for flow in config.flows:
+          if not flow.enabled:
+            continue
+          if flow.id in started_flows:
+            continue
+
+          candidates = [
+            path
+            for path in iter_matching_files(folder, flow.source_filename)
+            if self._handler.should_process_rescan_candidate(path)
+          ]
+          if not candidates:
+            continue
+
+          self._on_log(
+            'info',
+            f'[rede] Varredura encontrou {len(candidates)} arquivo(s) pendente(s) para '
+            f'"{flow.name}": {", ".join(path.name for path in candidates)}',
+          )
+          self._handler._process_file(candidates[0])
+          started_flows.add(flow.id)
+
+          if self._stop_event.is_set():
+            return
+      except Exception as exc:
+        self._on_log('error', f'Erro na varredura de rede: {exc}')
 

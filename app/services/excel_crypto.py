@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Optional
@@ -113,17 +114,53 @@ def _postprocess_saved_xlsx(
   if not sheet_files and not password:
     return
 
-  buffer = io.BytesIO()
   with zipfile.ZipFile(path, 'r') as zin:
-    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zout:
-      for item in zin.infolist():
-        data = zin.read(item.filename)
-        if password and item.filename == 'xl/workbook.xml':
-          data = _patch_workbook_password_xml(data, password)
-        elif item.filename in sheet_files:
-          data = _append_ignored_errors_xml(data, sheet_files[item.filename])
-        zout.writestr(item, data)
+    items = list(zin.infolist())
+    contents = {item.filename: zin.read(item.filename) for item in items}
+
+  if password:
+    contents['xl/workbook.xml'] = _patch_workbook_password_xml(contents['xl/workbook.xml'], password)
+
+  for filename, sqref in sheet_files.items():
+    if filename in contents:
+      contents[filename] = _append_ignored_errors_xml(contents[filename], sqref)
+
+  buffer = io.BytesIO()
+  with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zout:
+    for item in items:
+      zout.writestr(item, contents[item.filename])
   path.write_bytes(buffer.getvalue())
+
+
+def save_workbook_to_path(
+  workbook: WorkbookType,
+  path: Path,
+  password: Optional[str] = None,
+  *,
+  ignored_text_sqref_by_sheet: dict[str, str] | None = None,
+) -> None:
+  path.parent.mkdir(parents=True, exist_ok=True)
+  fd, tmp_name = tempfile.mkstemp(suffix='.xlsx.tmp', dir=path.parent)
+  os.close(fd)
+  tmp_path = Path(tmp_name)
+  try:
+    workbook.save(tmp_path)
+    if ignored_text_sqref_by_sheet or password:
+      _postprocess_saved_xlsx(
+        tmp_path,
+        workbook=workbook,
+        ignored_text_sqref_by_sheet=ignored_text_sqref_by_sheet,
+        password=password,
+      )
+    os.replace(tmp_path, path)
+    tmp_path = None
+  except OSError as exc:
+    raise ExcelFileError(format_excel_error(exc)) from exc
+  except Exception as exc:
+    raise ExcelFileError(format_excel_error(exc)) from exc
+  finally:
+    if tmp_path is not None and tmp_path.exists():
+      tmp_path.unlink(missing_ok=True)
 
 
 def read_file_sharing_password_hash(path: Path) -> Optional[str]:
@@ -221,40 +258,6 @@ def _inject_ignored_number_as_text(
     workbook=workbook,
     ignored_text_sqref_by_sheet=sqref_by_sheet,
   )
-
-
-def _excel_part_path(path: Path) -> Path:
-  return path.with_name(f'.{path.stem}{path.suffix}.part')
-
-
-def save_workbook_to_path(
-  workbook: WorkbookType,
-  path: Path,
-  password: Optional[str] = None,
-  *,
-  ignored_text_sqref_by_sheet: dict[str, str] | None = None,
-) -> None:
-  path.parent.mkdir(parents=True, exist_ok=True)
-  tmp_path = _excel_part_path(path)
-  if tmp_path.exists():
-    tmp_path.unlink(missing_ok=True)
-
-  try:
-    workbook.save(tmp_path)
-    if ignored_text_sqref_by_sheet or password:
-      _postprocess_saved_xlsx(
-        tmp_path,
-        workbook=workbook,
-        ignored_text_sqref_by_sheet=ignored_text_sqref_by_sheet,
-        password=password,
-      )
-    os.replace(tmp_path, path)
-    tmp_path = None
-  except OSError as exc:
-    raise ExcelFileError(format_excel_error(exc)) from exc
-  finally:
-    if tmp_path is not None and tmp_path.exists():
-      tmp_path.unlink(missing_ok=True)
 
 
 def create_empty_workbook() -> WorkbookType:
