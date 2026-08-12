@@ -3,6 +3,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from app.utils.network_paths import safe_exists, safe_is_dir, safe_is_file
+
 APP_DATA_DIR_NAME = '_AutomaticExcelFill'
 CONFIG_FILENAME = 'config.json'
 DEFAULT_LOG_FILENAME = 'automatic_fill.log'
@@ -39,23 +41,35 @@ def legacy_locks_root(watch_folder: str | Path) -> Path:
 
 def migrate_legacy_app_data(watch_folder: str | Path) -> None:
   folder = Path(watch_folder)
-  if not folder.is_dir():
+  if not safe_is_dir(folder):
     return
 
   target_dir = app_data_dir(folder)
-  target_dir.mkdir(parents=True, exist_ok=True)
+  try:
+    target_dir.mkdir(parents=True, exist_ok=True)
+  except OSError:
+    return
 
   legacy_config = legacy_shared_config_path(folder)
   shared_config = shared_config_path(folder)
-  if legacy_config.is_file() and not shared_config.is_file():
-    shutil.move(str(legacy_config), str(shared_config))
+  if safe_is_file(legacy_config) and not safe_is_file(shared_config):
+    try:
+      shutil.move(str(legacy_config), str(shared_config))
+    except OSError:
+      pass
 
   legacy_log = legacy_shared_log_path(folder)
   shared_log = default_shared_log_path(folder)
-  if legacy_log.is_file() and not shared_log.is_file():
-    shutil.move(str(legacy_log), str(shared_log))
+  if safe_is_file(legacy_log) and not safe_is_file(shared_log):
+    try:
+      shutil.move(str(legacy_log), str(shared_log))
+    except OSError:
+      pass
 
   legacy_locks = legacy_locks_root(folder)
   shared_locks = locks_root(folder)
-  if legacy_locks.is_dir() and not shared_locks.exists():
-    shutil.move(str(legacy_locks), str(shared_locks))
+  if safe_is_dir(legacy_locks) and not safe_exists(shared_locks):
+    try:
+      shutil.move(str(legacy_locks), str(shared_locks))
+    except OSError:
+      pass

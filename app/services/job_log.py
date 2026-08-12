@@ -6,13 +6,14 @@ from pathlib import Path
 
 from app.models.schema import AppConfig
 from app.utils.app_data_paths import default_shared_log_path, migrate_legacy_app_data
+from app.utils.network_paths import safe_is_dir
 
 
 def resolve_shared_log_path(config: AppConfig) -> Path:
   custom = (config.shared_log_path or '').strip()
   if custom:
     path = Path(custom)
-    if path.is_dir():
+    if safe_is_dir(path):
       return path / 'automatic_fill.log'
     return path
   watch_folder = (config.watch_folder or '').strip()

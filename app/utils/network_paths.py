@@ -29,3 +29,24 @@ def is_likely_network_path(path: str | Path) -> bool:
     return is_windows_mapped_network_drive(path)
   except Exception:
     return False
+
+
+def safe_is_dir(path: str | Path) -> bool:
+  try:
+    return Path(path).is_dir()
+  except OSError:
+    return False
+
+
+def safe_is_file(path: str | Path) -> bool:
+  try:
+    return Path(path).is_file()
+  except OSError:
+    return False
+
+
+def safe_exists(path: str | Path) -> bool:
+  try:
+    return Path(path).exists()
+  except OSError:
+    return False

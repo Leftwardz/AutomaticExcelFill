@@ -55,7 +55,7 @@ from app.services.file_stability import wait_for_file_stable
 
 from app.services.job_log import append_job_log, format_processing_duration, resolve_shared_log_path
 
-from app.utils.network_paths import is_likely_network_path
+from app.utils.network_paths import is_likely_network_path, safe_is_dir
 
 
 
@@ -570,9 +570,10 @@ class FolderWatcher:
 
     folder = Path(watch_folder)
 
-    if not folder.is_dir():
-
-      raise FileNotFoundError(f'Pasta de monitoramento inválida: {watch_folder}')
+    if not safe_is_dir(folder):
+      raise FileNotFoundError(
+        f'Pasta de monitoramento indisponível ou inválida: {watch_folder}',
+      )
 
 
 

@@ -9,6 +9,7 @@ from typing import Optional
 
 from app.models.schema import AppConfig, Flow
 from app.utils.app_data_paths import CONFIG_FILENAME, migrate_legacy_app_data, shared_config_path
+from app.utils.network_paths import safe_is_dir, safe_is_file
 from app.utils.filename_matching import filename_matches_pattern, has_wildcards
 
 CONFIG_ENV_VAR = 'AUTOMATIC_EXCEL_FILL_CONFIG'
@@ -54,12 +55,15 @@ def read_shared_config(watch_folder: str) -> AppConfig | None:
   folder = (watch_folder or '').strip()
   if not folder:
     return None
-  migrate_legacy_app_data(folder)
-  shared = shared_config_path(folder)
-  if not shared.is_file():
+  try:
+    migrate_legacy_app_data(folder)
+    shared = shared_config_path(folder)
+    if not safe_is_file(shared):
+      return None
+    with open(shared, encoding='utf-8') as handle:
+      return AppConfig.from_dict(json.load(handle))
+  except OSError:
     return None
-  with open(shared, encoding='utf-8') as handle:
-    return AppConfig.from_dict(json.load(handle))
 
 
 def active_config_path(config: AppConfig) -> Path:
@@ -76,11 +80,21 @@ def load_config() -> AppConfig:
 
   watch_folder = (config.watch_folder or '').strip()
   if watch_folder:
-    migrate_legacy_app_data(watch_folder)
-    shared = shared_config_path(watch_folder)
-    if shared.is_file() and shared.resolve() != bootstrap.resolve():
-      with open(shared, encoding='utf-8') as handle:
-        config = AppConfig.from_dict(json.load(handle))
+    try:
+      migrate_legacy_app_data(watch_folder)
+      shared = shared_config_path(watch_folder)
+      if safe_is_file(shared):
+        try:
+          shared_resolved = shared.resolve()
+          bootstrap_resolved = bootstrap.resolve()
+        except OSError:
+          shared_resolved = shared
+          bootstrap_resolved = bootstrap
+        if shared_resolved != bootstrap_resolved:
+          with open(shared, encoding='utf-8') as handle:
+            config = AppConfig.from_dict(json.load(handle))
+    except OSError:
+      pass
     return config
 
   override = os.environ.get(CONFIG_ENV_VAR, '').strip()
@@ -124,13 +138,16 @@ def find_flow_by_filename(config: AppConfig, filename: str) -> Optional[Flow]:
 
 def iter_matching_files(folder: Path, pattern: str):
   """Lista arquivos na pasta que correspondem ao padrão do fluxo."""
-  if not folder.is_dir():
+  if not safe_is_dir(folder):
     return
   if has_wildcards(pattern):
-    for path in sorted(folder.iterdir()):
-      if path.is_file() and filename_matches_pattern(path.name, pattern):
-        yield path
+    try:
+      for path in sorted(folder.iterdir()):
+        if path.is_file() and filename_matches_pattern(path.name, pattern):
+          yield path
+    except OSError:
+      return
     return
   candidate = folder / pattern
-  if candidate.is_file():
+  if safe_is_file(candidate):
     yield candidate

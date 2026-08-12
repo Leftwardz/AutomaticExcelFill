@@ -35,6 +35,7 @@ def _write_crash_log(path: Path, header: str, exc: BaseException) -> None:
 
 def _show_crash_dialog(message: str) -> None:
   try:
+    import tkinter as tk
     from tkinter import messagebox
 
     parent = _main_window
@@ -45,12 +46,22 @@ def _show_crash_dialog(message: str) -> None:
       except Exception:
         parent = None
 
-    if parent is not None:
+    if parent is None:
+      root = tk.Tk()
+      root.withdraw()
       messagebox.showerror(
         'AutomaticExcelFill — erro inesperado',
         message,
-        parent=parent,
+        parent=root,
       )
+      root.destroy()
+      return
+
+    messagebox.showerror(
+      'AutomaticExcelFill — erro inesperado',
+      message,
+      parent=parent,
+    )
   except Exception:
     pass
 
